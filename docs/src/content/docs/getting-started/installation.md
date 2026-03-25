@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: How to install Who Touched My Deps
+description: How to install Who Touched My Packages
 ---
 
 ## Prerequisites

@@ -1,0 +1,58 @@
+---
+const { title } = Astro.locals.starlightRoute.entry.data;
+---
+
+<svg role="none" style="width:0;height:0;position:absolute;top:0;left:0">
+    <filter id="bloom" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <feGaussianBlur stdDeviation="256.256" edgeMode="duplicate"></feGaussianBlur>
+    </filter>
+</svg>
+
+<div class="bloom-container">
+    <div class="bloom-wrapper">
+        <div class="bloom">
+            <div class="bloom-shape"></div>
+        </div>
+    </div>
+</div>
+
+<h1 id="_top">{title}</h1>
+
+
+<style>
+    body {
+        background: #0C0D12ff;
+    }
+    body::before {
+        display: none !important;
+        
+    }
+    
+    .bloom-container {
+        filter: url(#bloom);
+        pointer-events: none;
+        z-index: -1;
+        width: 100vw;
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+    .bloom {
+        z-index: -1;
+        position: absolute;
+        top: -20px;
+        left: -200px;
+    }
+    .bloom-shape {
+        content: "";
+        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        z-index: -1;
+        opacity: .9;
+        background: linear-gradient(90deg, #36f, #10e0d9) 50% / cover no-repeat fixed;
+        width: 65vw;
+        min-width: 700px;
+        max-width: 944px;
+        height: 200px;
+    }
+</style>
