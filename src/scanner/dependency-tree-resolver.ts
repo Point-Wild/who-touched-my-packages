@@ -2,6 +2,47 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+const REGISTRY_CACHE = new Map<string, any>();
+
+async function fetchPackageFromRegistry(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (REGISTRY_CACHE.has(cacheKey)) {
+    return REGISTRY_CACHE.get(cacheKey);
+  }
+
+  try {
+    // Normalize version spec to get a concrete version
+    const normalizedVersion = versionSpec.replace(/^[^\d]*/, '') || 'latest';
+    const url = `https://registry.npmjs.org/${name}/${normalizedVersion}`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      // Try with 'latest' tag if specific version fails
+      if (normalizedVersion !== 'latest') {
+        const latestUrl = `https://registry.npmjs.org/${name}/latest`;
+        const latestResponse = await fetch(latestUrl, {
+          headers: { 'Accept': 'application/json' },
+        });
+        if (latestResponse.ok) {
+          const data = await latestResponse.json();
+          REGISTRY_CACHE.set(cacheKey, data);
+          return data;
+        }
+      }
+      return null;
+    }
+
+    const data = await response.json();
+    REGISTRY_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
 export interface DependencyNode {
   name: string;
   version: string;
@@ -59,69 +100,64 @@ async function resolveNpmDependency(
   
   visited.add(nodeKey);
   
+  // Try to find package locally first
   const packageJsonPath = await findPackageJson(name, parentFile);
-  if (!packageJsonPath) {
-    return {
-      name,
-      version: versionSpec.replace(/^[\^~>=<]+/, ''),
-      versionSpec,
-      ecosystem: 'npm',
-      file: parentFile,
-      isDev,
-      dependencies: [],
-      depth,
-      paths: [[...currentPath, name]],
-    };
+  
+  let pkg: any = null;
+  let resolvedVersion = versionSpec.replace(/^[\^~>=<]+/, '');
+  let sourceFile = packageJsonPath || parentFile;
+  
+  if (packageJsonPath) {
+    // Package found locally - read from node_modules
+    try {
+      const content = await readFile(packageJsonPath, 'utf-8');
+      pkg = JSON.parse(content);
+      resolvedVersion = pkg.version || resolvedVersion;
+      sourceFile = packageJsonPath;
+    } catch (error) {
+      // Fall through to registry fetch
+    }
   }
   
-  try {
-    const content = await readFile(packageJsonPath, 'utf-8');
-    const pkg = JSON.parse(content);
-    const version = pkg.version || versionSpec.replace(/^[\^~>=<]+/, '');
-    
-    const node: DependencyNode = {
-      name,
-      version,
-      versionSpec,
-      ecosystem: 'npm',
-      file: packageJsonPath,
-      isDev,
-      dependencies: [],
-      depth,
-      paths: [[...currentPath, name]],
-    };
-    
-    if (pkg.dependencies && depth < MAX_DEPTH - 1) {
-      for (const [depName, depVersion] of Object.entries(pkg.dependencies)) {
-        const childNode = await resolveNpmDependency(
-          depName,
-          depVersion as string,
-          packageJsonPath,
-          false,
-          depth + 1,
-          visited,
-          [...currentPath, name]
-        );
-        if (childNode) {
-          node.dependencies.push(childNode);
-        }
+  // If not found locally or failed to read, fetch from registry
+  if (!pkg) {
+    pkg = await fetchPackageFromRegistry(name, versionSpec);
+    if (pkg) {
+      resolvedVersion = pkg.version || resolvedVersion;
+    }
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'npm',
+    file: sourceFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  // Recursively resolve dependencies if we have package data
+  if (pkg?.dependencies && depth < MAX_DEPTH - 1) {
+    for (const [depName, depVersion] of Object.entries(pkg.dependencies)) {
+      const childNode = await resolveNpmDependency(
+        depName,
+        depVersion as string,
+        sourceFile,
+        false,
+        depth + 1,
+        visited,
+        [...currentPath, name]
+      );
+      if (childNode) {
+        node.dependencies.push(childNode);
       }
     }
-    
-    return node;
-  } catch (error) {
-    return {
-      name,
-      version: versionSpec.replace(/^[\^~>=<]+/, ''),
-      versionSpec,
-      ecosystem: 'npm',
-      file: parentFile,
-      isDev,
-      dependencies: [],
-      depth,
-      paths: [[...currentPath, name]],
-    };
   }
+  
+  return node;
 }
 
 export async function buildDependencyTree(
