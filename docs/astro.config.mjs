@@ -2,7 +2,6 @@ import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import starlightImageZoom from 'starlight-image-zoom';
-import starlightThemeFlexoki from 'starlight-theme-flexoki';
 import startlightThemeVintage from 'starlight-theme-vintage';
 
 // https://astro.build/config
@@ -18,10 +17,11 @@ export default defineConfig({
         starlight({
             components: {
                 SocialIcons: './src/components/SocialIcons.astro',
+                SiteTitle: './src/components/Title.astro',
+                ThemeSelect: './src/components/ThemeSelect.astro',
             },
             plugins: [
                 starlightImageZoom({ showCaptions: true }),
-                // starlightThemeFlexoki(),
                 startlightThemeVintage()
             ],
             title: 'Who Touched My Packages?',
