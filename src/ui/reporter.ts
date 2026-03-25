@@ -1,12 +1,14 @@
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
-import type { DependencyFile } from '../scanner/types.js';
+import type { Dependency, DependencyEdge, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatSummary, formatVulnerability } from './formatters.js';
+import type { ReportData } from './html-report/types.js';
 import { theme } from './theme.js';
 
 export interface ReporterOptions {
   json?: boolean;
   severityFilter?: string;
   verbose?: boolean;
+  html?: boolean;
 }
 
 export class Reporter {
@@ -24,26 +26,42 @@ export class Reporter {
     console.log(formatFileList(files));
   }
   
-  reportResults(result: AuditResult): void {
+  reportResults(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
     if (this.options.json) {
       this.reportJson(result);
       return;
     }
     
-    this.reportTerminal(result);
+    this.reportTerminal(result, files, dependencies);
   }
   
-  private reportTerminal(result: AuditResult): void {
+  private reportTerminal(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+    // Show scan overview first
+    if (files && dependencies) {
+      console.log(formatFileList(files));
+    }
+    
     console.log(formatSummary(result));
     
     if (result.vulnerabilities.length === 0) {
+      this.showFinalSummary(result, files, dependencies);
       return;
     }
     
-    const filtered = this.filterBySeverity(result.vulnerabilities);
+    let filtered = this.filterBySeverity(result.vulnerabilities);
+    
+    // Filter out unhelpful UNKNOWN vulnerabilities unless verbose mode
+    if (!this.options.verbose) {
+      filtered = this.filterUnhelpfulVulnerabilities(filtered);
+    }
     
     if (filtered.length === 0) {
-      console.log(theme.info('\nNo vulnerabilities match the severity filter.\n'));
+      if (this.options.severityFilter) {
+        console.log(theme.info('\nNo vulnerabilities match the severity filter.\n'));
+      } else {
+        console.log(theme.dim('\nAll findings have insufficient information. Use --verbose to see them.\n'));
+      }
+      this.showFinalSummary(result, files, dependencies);
       return;
     }
     
@@ -54,6 +72,62 @@ export class Reporter {
       console.log(formatVulnerability(vuln));
       console.log(theme.dim('─'.repeat(60)));
     }
+    
+    // Show hint about hidden vulnerabilities
+    const hiddenCount = result.vulnerabilities.length - filtered.length;
+    if (hiddenCount > 0 && !this.options.verbose) {
+      console.log(theme.dim(`\n💡 ${hiddenCount} additional finding(s) with limited information hidden. Use --verbose to see all.\n`));
+    }
+    
+    this.showFinalSummary(result, files, dependencies);
+  }
+  
+  private showFinalSummary(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+    console.log('\n' + theme.bold('═'.repeat(60)));
+    console.log(theme.bold(`📊 Final Summary`));
+    console.log(theme.bold('═'.repeat(60)));
+    
+    if (files) {
+      console.log(theme.bold(`Files Scanned: `) + `${files.length}`);
+    }
+    if (dependencies) {
+      console.log(theme.bold(`Packages Analyzed: `) + `${dependencies.length}`);
+    }
+    console.log(theme.bold(`Vulnerabilities Found: `) + `${result.summary.total}`);
+    
+    if (result.summary.total > 0) {
+      console.log('\n' + theme.bold('By Severity:'));
+      if (result.summary.critical > 0) {
+        console.log(theme.critical(`  🚨 Critical: ${result.summary.critical}`));
+      }
+      if (result.summary.high > 0) {
+        console.log(theme.high(`  ⚠️  High: ${result.summary.high}`));
+      }
+      if (result.summary.medium > 0) {
+        console.log(theme.medium(`  ⚡ Medium: ${result.summary.medium}`));
+      }
+      if (result.summary.low > 0) {
+        console.log(theme.low(`  💡 Low: ${result.summary.low}`));
+      }
+      if (result.summary.unknown > 0) {
+        console.log(theme.dim(`  ❓ Unknown: ${result.summary.unknown}`));
+      }
+    }
+    
+    console.log('\n' + theme.bold('═'.repeat(60)));
+    
+    if (result.summary.total === 0) {
+      console.log(theme.success(`\n✅ All clear! No vulnerabilities found.`));
+    } else {
+      const criticalAndHigh = result.summary.critical + result.summary.high;
+      if (criticalAndHigh > 0) {
+        console.log(theme.critical(`\n❌ ${criticalAndHigh} critical/high severity vulnerabilities require immediate attention!`));
+      } else {
+        console.log(theme.medium(`\n⚠️  ${result.summary.total} vulnerabilities found. Review recommended.`));
+      }
+    }
+    
+    console.log(''); // Add final newline
   }
   
   private reportJson(result: AuditResult): void {
@@ -101,5 +175,39 @@ export class Reporter {
       const vulnIndex = severityOrder.indexOf(v.severity);
       return vulnIndex <= minIndex;
     });
+  }
+  
+  private filterUnhelpfulVulnerabilities(vulnerabilities: Vulnerability[]): Vulnerability[] {
+    return vulnerabilities.filter(v => {
+      // Keep all non-UNKNOWN vulnerabilities
+      if (v.severity !== 'UNKNOWN') {
+        return true;
+      }
+      
+      // For UNKNOWN, only keep if it has meaningful information
+      const hasDescription = v.description && 
+                            v.description !== 'No description available' && 
+                            v.description.trim().length > 0;
+      const hasReferences = v.references && v.references.length > 0;
+      const hasCvss = v.cvss !== undefined && v.cvss !== null;
+      const hasFixedVersion = v.fixedVersions && v.fixedVersions.length > 0;
+      const hasAffectedVersions = v.affectedVersions && v.affectedVersions !== 'Unknown';
+      
+      return hasDescription || hasReferences || hasCvss || hasFixedVersion || hasAffectedVersions;
+    });
+  }
+  
+  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string, languageStats?: import('./html-report/types.js').LanguageStats[], dependencyEdges?: DependencyEdge[]): Promise<{ url: string; close: () => void }> {
+    const reportData: ReportData = {
+      auditResult: result,
+      dependencies,
+      scanPath,
+      repositoryUrl,
+      languageStats,
+      dependencyEdges,
+    };
+    
+    const { generateAndServeReport } = await import('./html-report/new-generator.js');
+    return await generateAndServeReport(reportData);
   }
 }

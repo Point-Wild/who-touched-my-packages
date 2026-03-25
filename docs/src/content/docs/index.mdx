@@ -10,7 +10,7 @@ hero:
       icon: right-arrow
       variant: primary
     - text: View on GitHub
-      link: https://github.com/knackstedt/who-touched-my-deps
+      link: https://github.com/Point-Wild/who-touched-my-packages
       icon: external
       variant: minimal
 ---
@@ -22,6 +22,9 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 <CardGrid stagger>
   <Card title="Multi-Ecosystem" icon="puzzle">
     Supports npm (package.json) and Python (requirements.txt) with more coming soon
+  </Card>
+  <Card title="Remote Repository Scanning" icon="github">
+    Clone and scan any Git repository directly without manual setup
   </Card>
   <Card title="Multiple Data Sources" icon="random">
     Queries OSV and GitHub Advisory Database for comprehensive vulnerability coverage
@@ -51,7 +54,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 Install globally:
 
 ```bash
-npm install -g who-touched-my-deps
+npm install -g who-touched-my-packages
 ```
 
 Scan your project:

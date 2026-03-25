@@ -1,22 +1,28 @@
 {
-  "name": "who-touched-my-deps",
-  "version": "0.0.2-0",
+  "name": "who-touched-my-packages",
+  "version": "0.0.6",
   "description": "A beautiful CLI tool for auditing dependencies and finding vulnerabilities",
   "type": "module",
   "bin": {
-    "wtmd": "dist/index.js",
-    "who-touched-my-deps": "dist/index.js"
+    "wtmp": "dist/index.js",
+    "who-touched-my-packages": "dist/index.js"
   },
   "repository": {
     "url": "git+https://github.com/Point-Wild/who-touched-my-packages.git"
   },
   "files": [
     "README.md",
-    "dist"
+    "dist",
+    "client/dist"
   ],
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build",
+    "test:node": "bun src/index.ts --repo https://github.com/appsecco/dvna",
+    "test:python": "bun src/index.ts --repo https://github.com/anxolerd/dvpwa",
+    "test:html": "bun src/index.ts --repo https://github.com/appsecco/dvna --html",
+    "build": "npm run build:client && vite build && npm run postbuild",
+    "postbuild": "chmod +x dist/index.js",
+    "build:client": "cd client && bun install && bun run build",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
   },
@@ -39,11 +45,21 @@
     "@langchain/langgraph": "^1.2.5",
     "@langchain/openai": "^1.3.1",
     "commander": "11.1.0",
+    "open": "^10.1.0",
     "ora": "8.2.0",
     "picocolors": "1.1.1"
   },
   "devDependencies": {
     "@types/node": "20.19.37",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@xyflow/react": "^12.10.1",
+    "elkjs": "^0.11.1",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^2.15.0",
     "typescript": "5.9.3",
     "vite": "7.3.1"
   },

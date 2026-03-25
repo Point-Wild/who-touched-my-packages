@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://knackstedt.github.io/shokupan/sitemap-index.xml
+Sitemap: https://Point-Wild.github.io/who-touched-my-packages/sitemap-index.xml

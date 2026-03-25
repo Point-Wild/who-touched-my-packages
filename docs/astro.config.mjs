@@ -6,8 +6,8 @@ import starlightThemeFlexoki from 'starlight-theme-flexoki';
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://who-touched-my-deps.dev',
-    base: '/',
+    site: 'https://Point-Wild.github.io/who-touched-my-packages',
+    base: '/who-touched-my-packages/',
     integrations: [
         sitemap({
             changefreq: 'weekly',
@@ -25,10 +25,10 @@ export default defineConfig({
             title: 'Who Touched My Deps?',
             description: 'A beautiful CLI tool for auditing dependencies and finding vulnerabilities',
             social: [
-                { label: 'GitHub', href: 'https://github.com/point-wild/who-touched-my-deps', icon: 'github' },
+                { label: 'GitHub', href: 'https://github.com/point-wild/who-touched-my-packages', icon: 'github' },
             ],
             editLink: {
-                baseUrl: 'https://github.com/point-wild/who-touched-my-deps/edit/main/docs/',
+                baseUrl: 'https://github.com/point-wild/who-touched-my-packages/edit/main/docs/',
             },
             sidebar: [
                 {

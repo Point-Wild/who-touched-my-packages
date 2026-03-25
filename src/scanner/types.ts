@@ -11,11 +11,20 @@ export interface Dependency {
   ecosystem: 'npm' | 'pypi';
   file: string;
   isDev?: boolean;
+  depth?: number;
+  paths?: string[][];
+}
+
+export interface DependencyEdge {
+  source: string;
+  target: string;
+  type: 'dependency' | 'dev';
 }
 
 export interface ScanResult {
   files: DependencyFile[];
   dependencies: Dependency[];
+  dependencyEdges?: DependencyEdge[];
   scanPath: string;
   timestamp: Date;
 }
