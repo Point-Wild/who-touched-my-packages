@@ -78,14 +78,13 @@ async function main() {
   if (!options.json) {
     clack.intro(theme.bold(`${icons.shield} Who Touched My Deps?`));
     console.log(theme.dim('  ⚠️  This program is a work in progress. Accuracy is not guaranteed.\n'));
-    console.log(theme.dim('  Scanning dependencies for vulnerabilities...\n'));
   }
   
   let spinner: ReturnType<typeof ora> | null = null;
   
   if (!options.json) {
     spinner = ora({
-      text: 'Finding dependency files...',
+      text: 'Scanning for dependency files...',
       color: 'cyan',
     }).start();
   }
@@ -93,7 +92,7 @@ async function main() {
   const files = await findDependencyFiles(scanPath, options.exclude);
   
   if (spinner) {
-    spinner.succeed(`Found ${files.length} dependency file(s)`);
+    spinner.text = 'Parsing dependencies...';
   }
   
   if (files.length === 0) {
@@ -103,6 +102,12 @@ async function main() {
     process.exit(0);
   }
   
+  const dependencies = await parseDependencies(files);
+  
+  if (spinner) {
+    spinner.text = 'Checking for vulnerabilities...';
+  }
+  
   const reporter = new Reporter({
     json: options.json,
     severityFilter: options.severity,
@@ -110,33 +115,13 @@ async function main() {
     html: options.html,
   });
   
-  if (!options.json && !options.html) {
-    reporter.reportFiles(files);
-  }
-  
-  if (!options.json && !options.html) {
-    spinner = ora({
-      text: 'Parsing dependencies...',
-      color: 'cyan',
-    }).start();
-  }
-  
-  const dependencies = await parseDependencies(files);
-  
-  if (spinner) {
-    spinner.succeed(`Parsed ${dependencies.length} package(s)`);
-  }
-  
   // Build dependency trees for graph visualization
   let allDependencies: Dependency[] = dependencies;
   let dependencyEdges: DependencyEdge[] = [];
   
   if (options.html) {
-    if (!options.json) {
-      spinner = ora({
-        text: 'Building dependency trees...',
-        color: 'cyan',
-      }).start();
+    if (spinner) {
+      spinner.text = 'Building dependency trees...';
     }
     
     const npmFiles = files.filter(f => f.type === 'package.json');
@@ -167,10 +152,6 @@ async function main() {
     }
     
     allDependencies = Array.from(allTreeNodes.values());
-    
-    if (spinner) {
-      spinner.succeed(`Built dependency trees (${allDependencies.length} total packages, ${dependencyEdges.length} edges)`);
-    }
   }
   
   if (dependencies.length === 0) {
@@ -178,13 +159,6 @@ async function main() {
       clack.outro(theme.dim('No dependencies found.'));
     }
     process.exit(0);
-  }
-  
-  if (!options.json && !options.html) {
-    spinner = ora({
-      text: 'Checking for vulnerabilities (OSV + GitHub)...',
-      color: 'cyan',
-    }).start();
   }
   
   const dataSources = [
@@ -196,42 +170,33 @@ async function main() {
   const result = await checker.checkDependencies(dependencies);
   
   if (spinner) {
-    spinner.stop();
+    spinner.succeed('Scan complete');
   }
   
   if (options.html) {
     if (!options.json) {
       spinner = ora({
-        text: 'Detecting languages...',
+        text: 'Generating HTML report...',
         color: 'cyan',
       }).start();
     }
     
     const languageStats = await detectLanguages(scanPath, options.exclude);
-    
-    if (spinner) {
-      spinner.succeed(`Detected ${languageStats.length} language(s)`);
-      spinner = ora({
-        text: 'Starting report server...',
-        color: 'cyan',
-      }).start();
-    }
-    
     const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges);
     
     if (spinner) {
-      spinner.succeed(`Report server started at ${server.url}`);
+      spinner.succeed('HTML report generated');
     }
     
     if (!options.json) {
-      console.log(theme.info(`\n📄 Opening report in browser...\n`));
+      console.log(theme.info(`\n📄 Opening report in browser...`));
     }
     
     await open(server.url);
     
     if (!options.json) {
       console.log(theme.success(`${icons.success} Report opened in browser!`));
-      console.log(theme.dim(`\nServer running at ${server.url}`));
+      console.log(theme.dim(`Server running at ${server.url}`));
       console.log(theme.dim('Press Ctrl+C to stop the server\n'));
     }
     
@@ -250,15 +215,7 @@ async function main() {
     // Don't exit - keep server running
     return;
   } else {
-    reporter.reportResults(result);
-    
-    if (!options.json) {
-      if (result.summary.total === 0) {
-        clack.outro(theme.success(`${icons.success} All clear! No vulnerabilities found.`));
-      } else {
-        clack.outro(theme.dim('Scan complete.'));
-      }
-    }
+    reporter.reportResults(result, files, dependencies);
   }
   
   if (cleanup) {

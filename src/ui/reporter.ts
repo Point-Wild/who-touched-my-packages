@@ -26,19 +26,25 @@ export class Reporter {
     console.log(formatFileList(files));
   }
   
-  reportResults(result: AuditResult): void {
+  reportResults(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
     if (this.options.json) {
       this.reportJson(result);
       return;
     }
     
-    this.reportTerminal(result);
+    this.reportTerminal(result, files, dependencies);
   }
   
-  private reportTerminal(result: AuditResult): void {
+  private reportTerminal(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+    // Show scan overview first
+    if (files && dependencies) {
+      console.log(formatFileList(files));
+    }
+    
     console.log(formatSummary(result));
     
     if (result.vulnerabilities.length === 0) {
+      this.showFinalSummary(result, files, dependencies);
       return;
     }
     
@@ -55,6 +61,7 @@ export class Reporter {
       } else {
         console.log(theme.dim('\nAll findings have insufficient information. Use --verbose to see them.\n'));
       }
+      this.showFinalSummary(result, files, dependencies);
       return;
     }
     
@@ -71,6 +78,56 @@ export class Reporter {
     if (hiddenCount > 0 && !this.options.verbose) {
       console.log(theme.dim(`\n💡 ${hiddenCount} additional finding(s) with limited information hidden. Use --verbose to see all.\n`));
     }
+    
+    this.showFinalSummary(result, files, dependencies);
+  }
+  
+  private showFinalSummary(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+    console.log('\n' + theme.bold('═'.repeat(60)));
+    console.log(theme.bold(`📊 Final Summary`));
+    console.log(theme.bold('═'.repeat(60)));
+    
+    if (files) {
+      console.log(theme.bold(`Files Scanned: `) + `${files.length}`);
+    }
+    if (dependencies) {
+      console.log(theme.bold(`Packages Analyzed: `) + `${dependencies.length}`);
+    }
+    console.log(theme.bold(`Vulnerabilities Found: `) + `${result.summary.total}`);
+    
+    if (result.summary.total > 0) {
+      console.log('\n' + theme.bold('By Severity:'));
+      if (result.summary.critical > 0) {
+        console.log(theme.critical(`  🚨 Critical: ${result.summary.critical}`));
+      }
+      if (result.summary.high > 0) {
+        console.log(theme.high(`  ⚠️  High: ${result.summary.high}`));
+      }
+      if (result.summary.medium > 0) {
+        console.log(theme.medium(`  ⚡ Medium: ${result.summary.medium}`));
+      }
+      if (result.summary.low > 0) {
+        console.log(theme.low(`  💡 Low: ${result.summary.low}`));
+      }
+      if (result.summary.unknown > 0) {
+        console.log(theme.dim(`  ❓ Unknown: ${result.summary.unknown}`));
+      }
+    }
+    
+    console.log('\n' + theme.bold('═'.repeat(60)));
+    
+    if (result.summary.total === 0) {
+      console.log(theme.success(`\n✅ All clear! No vulnerabilities found.`));
+    } else {
+      const criticalAndHigh = result.summary.critical + result.summary.high;
+      if (criticalAndHigh > 0) {
+        console.log(theme.critical(`\n❌ ${criticalAndHigh} critical/high severity vulnerabilities require immediate attention!`));
+      } else {
+        console.log(theme.medium(`\n⚠️  ${result.summary.total} vulnerabilities found. Review recommended.`));
+      }
+    }
+    
+    console.log(''); // Add final newline
   }
   
   private reportJson(result: AuditResult): void {

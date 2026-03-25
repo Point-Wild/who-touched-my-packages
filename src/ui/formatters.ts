@@ -54,56 +54,50 @@ export function formatVulnerability(vuln: Vulnerability): string {
 export function formatSummary(result: AuditResult): string {
   let output = '\n';
   output += theme.bold('═'.repeat(60)) + '\n';
-  output += theme.bold(`${icons.shield} Security Audit Summary\n`);
+  output += theme.bold(`${icons.shield} Security Audit Results\n`);
   output += theme.bold('═'.repeat(60)) + '\n\n';
-  
-  output += theme.bold(`Scanned Packages: `) + `${result.scannedPackages}\n`;
   
   // Calculate meaningful vulnerabilities (exclude UNKNOWN with no info)
   const meaningfulCount = result.summary.critical + result.summary.high + result.summary.medium + result.summary.low;
   
   if (meaningfulCount > 0) {
-    output += theme.bold(`Total Vulnerabilities: `) + `${meaningfulCount}\n`;
+    output += theme.bold(`Vulnerabilities Found: `) + `${meaningfulCount}`;
     if (result.summary.unknown > 0) {
-      output += theme.dim(`(${result.summary.unknown} additional findings with unknown severity)\n`);
+      output += theme.dim(` (+${result.summary.unknown} unknown severity)`);
     }
-    output += '\n';
+    output += '\n\n';
+    
+    if (result.summary.critical > 0) {
+      output += theme.critical(`${icons.critical} Critical: ${result.summary.critical}\n`);
+    }
+    if (result.summary.high > 0) {
+      output += theme.high(`${icons.high} High: ${result.summary.high}\n`);
+    }
+    if (result.summary.medium > 0) {
+      output += theme.medium(`${icons.medium} Medium: ${result.summary.medium}\n`);
+    }
+    if (result.summary.low > 0) {
+      output += theme.low(`${icons.low} Low: ${result.summary.low}\n`);
+    }
   } else if (result.summary.unknown > 0) {
-    output += theme.bold(`Total Vulnerabilities: `) + `${result.summary.unknown}\n`;
-    output += theme.dim(`(All findings have unknown severity)\n\n`);
+    output += theme.dim(`${result.summary.unknown} findings with unknown severity\n`);
   } else {
-    output += theme.bold(`Total Vulnerabilities: `) + `0\n\n`;
+    output += theme.success(`${icons.success} No vulnerabilities found!\n`);
   }
   
-  if (result.summary.critical > 0) {
-    output += theme.critical(`${icons.critical} Critical: ${result.summary.critical}\n`);
-  }
-  if (result.summary.high > 0) {
-    output += theme.high(`${icons.high} High: ${result.summary.high}\n`);
-  }
-  if (result.summary.medium > 0) {
-    output += theme.medium(`${icons.medium} Medium: ${result.summary.medium}\n`);
-  }
-  if (result.summary.low > 0) {
-    output += theme.low(`${icons.low} Low: ${result.summary.low}\n`);
-  }
-  
-  if (result.summary.total === 0) {
-    output += theme.success(`\n${icons.success} No vulnerabilities found!\n`);
-  }
-  
-  output += '\n' + theme.bold('═'.repeat(60)) + '\n';
+  output += '\n' + theme.bold('═'.repeat(60));
   
   return output;
 }
 
 export function formatFileList(files: DependencyFile[]): string {
   let output = '\n';
-  output += theme.bold(`${icons.file} Found ${files.length} dependency file(s):\n\n`);
+  output += theme.bold(`${icons.file} Scanned Files (${files.length}):\n`);
+  output += theme.dim('─'.repeat(40)) + '\n';
   
   for (const file of files) {
     const icon = file.type === 'package.json' ? icons.package : icons.file;
-    output += theme.dim(`  ${icon} ${file.relativePath}\n`);
+    output += theme.dim(`${icon} ${file.relativePath}\n`);
   }
   
   return output;

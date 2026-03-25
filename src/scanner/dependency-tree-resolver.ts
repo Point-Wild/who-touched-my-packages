@@ -1,6 +1,6 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { existsSync } from 'node:fs';
 
 export interface DependencyNode {
   name: string;
@@ -21,7 +21,7 @@ export interface DependencyTree {
   edges: Array<{ source: string; target: string; type: 'dependency' | 'dev' }>;
 }
 
-const MAX_DEPTH = 5;
+const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
