@@ -76,7 +76,7 @@ async function main() {
   }
   
   if (!options.json) {
-    clack.intro(theme.bold(`${icons.shield} Who Touched My Deps?`));
+    clack.intro(theme.bold(`${icons.shield} Who Touched My Packages?`));
     console.log(theme.dim('  ⚠️  This program is a work in progress. Accuracy is not guaranteed.\n'));
   }
   
@@ -125,6 +125,7 @@ async function main() {
     }
     
     const npmFiles = files.filter(f => f.type === 'package.json');
+    const pythonFiles = files.filter(f => f.type === 'requirements.txt');
     const allTreeNodes = new Map<string, Dependency>();
     
     for (const file of npmFiles) {
@@ -148,6 +149,17 @@ async function main() {
         dependencyEdges.push(...tree.edges);
       } catch (error) {
         // Skip files that fail to parse
+      }
+    }
+    
+    // Include Python dependencies in the graph (flat list, no deep tree resolution yet)
+    for (const file of pythonFiles) {
+      const pythonDeps = dependencies.filter(d => d.file === file.path && d.ecosystem === 'pypi');
+      for (const dep of pythonDeps) {
+        const key = `${dep.name}@${dep.version}`;
+        if (!allTreeNodes.has(key)) {
+          allTreeNodes.set(key, dep);
+        }
       }
     }
     
