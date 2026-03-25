@@ -1,6 +1,6 @@
-import { DataSource } from './base.js';
 import type { Dependency } from '../../scanner/types.js';
 import type { Vulnerability } from '../types.js';
+import { DataSource } from './base.js';
 
 interface OSVQuery {
   package: {
@@ -73,7 +73,7 @@ export class OSVDataSource extends DataSource {
         return [];
       }
       
-      const data: OSVResponse = await response.json();
+      const data = await response.json() as OSVResponse;
       const vulnerabilities: Vulnerability[] = [];
       
       for (let i = 0; i < data.results.length; i++) {
@@ -82,7 +82,16 @@ export class OSVDataSource extends DataSource {
         
         if (result.vulns) {
           for (const vuln of result.vulns) {
-            vulnerabilities.push(this.transformVulnerability(vuln, dep));
+            if (!vuln.severity || vuln.severity.length === 0) {
+              const detailedVuln = await this.fetchVulnerabilityDetails(vuln.id);
+              if (detailedVuln) {
+                vulnerabilities.push(this.transformVulnerability(detailedVuln, dep));
+              } else {
+                vulnerabilities.push(this.transformVulnerability(vuln, dep));
+              }
+            } else {
+              vulnerabilities.push(this.transformVulnerability(vuln, dep));
+            }
           }
         }
       }
@@ -90,6 +99,18 @@ export class OSVDataSource extends DataSource {
       return vulnerabilities;
     } catch (error) {
       return [];
+    }
+  }
+  
+  private async fetchVulnerabilityDetails(vulnId: string): Promise<OSVVulnerability | null> {
+    try {
+      const response = await this.fetchWithRetry(`https://api.osv.dev/v1/vulns/${vulnId}`);
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json() as OSVVulnerability;
+    } catch (error) {
+      return null;
     }
   }
   
@@ -126,7 +147,8 @@ export class OSVDataSource extends DataSource {
     
     for (const sev of vuln.severity) {
       if (sev.type === 'CVSS_V3') {
-        const score = parseFloat(sev.score.split('/')[0]);
+        const score = this.parseCVSSScore(sev.score);
+        if (score === undefined) continue;
         if (score >= 9.0) return 'CRITICAL';
         if (score >= 7.0) return 'HIGH';
         if (score >= 4.0) return 'MEDIUM';
@@ -142,11 +164,63 @@ export class OSVDataSource extends DataSource {
     
     for (const sev of vuln.severity) {
       if (sev.type === 'CVSS_V3') {
-        return parseFloat(sev.score.split('/')[0]);
+        return this.parseCVSSScore(sev.score);
       }
     }
     
     return undefined;
+  }
+  
+  private parseCVSSScore(cvssString: string): number | undefined {
+    if (!cvssString.startsWith('CVSS:3.')) {
+      const numericScore = parseFloat(cvssString.split('/')[0]);
+      return isNaN(numericScore) ? undefined : numericScore;
+    }
+    
+    const metrics = cvssString.split('/').slice(1);
+    const metricMap: Record<string, string> = {};
+    
+    for (const metric of metrics) {
+      const [key, value] = metric.split(':');
+      metricMap[key] = value;
+    }
+    
+    const av = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 }[metricMap.AV] || 0;
+    const ac = { L: 0.77, H: 0.44 }[metricMap.AC] || 0;
+    const ui = { N: 0.85, R: 0.62 }[metricMap.UI] || 0;
+    const scope = metricMap.S || 'U';
+    
+    let pr: number;
+    if (scope === 'U') {
+      pr = { N: 0.85, L: 0.62, H: 0.27 }[metricMap.PR] || 0;
+    } else {
+      pr = { N: 0.85, L: 0.68, H: 0.50 }[metricMap.PR] || 0;
+    }
+    
+    const c = { N: 0, L: 0.22, H: 0.56 }[metricMap.C] || 0;
+    const i = { N: 0, L: 0.22, H: 0.56 }[metricMap.I] || 0;
+    const a = { N: 0, L: 0.22, H: 0.56 }[metricMap.A] || 0;
+    
+    const iscBase = 1 - ((1 - c) * (1 - i) * (1 - a));
+    const exploitability = 8.22 * av * ac * pr * ui;
+    
+    let impact: number;
+    if (scope === 'U') {
+      impact = 6.42 * iscBase;
+    } else {
+      impact = 7.52 * (iscBase - 0.029) - 3.25 * Math.pow(iscBase - 0.02, 15);
+    }
+    
+    let baseScore: number;
+    if (impact <= 0) {
+      baseScore = 0;
+    } else if (scope === 'U') {
+      baseScore = Math.min(impact + exploitability, 10);
+    } else {
+      baseScore = Math.min(1.08 * (impact + exploitability), 10);
+    }
+    
+    return Math.round(Math.ceil(baseScore * 10) / 10 * 10) / 10;
   }
   
   private extractFixedVersions(vuln: OSVVulnerability): string | undefined {

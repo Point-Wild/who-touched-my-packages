@@ -1,6 +1,6 @@
-import { DataSource } from './base.js';
 import type { Dependency } from '../../scanner/types.js';
 import type { Vulnerability } from '../types.js';
+import { DataSource } from './base.js';
 
 interface GitHubAdvisory {
   id: string;
@@ -174,7 +174,7 @@ export class GitHubDataSource extends DataSource {
           continue;
         }
         
-        const data: GitHubResponse = await response.json();
+        const data = await response.json() as GitHubResponse;
         
         if (data.errors) {
           continue;

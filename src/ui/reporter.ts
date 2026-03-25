@@ -40,10 +40,19 @@ export class Reporter {
       return;
     }
     
-    const filtered = this.filterBySeverity(result.vulnerabilities);
+    let filtered = this.filterBySeverity(result.vulnerabilities);
+    
+    // Filter out unhelpful UNKNOWN vulnerabilities unless verbose mode
+    if (!this.options.verbose) {
+      filtered = this.filterUnhelpfulVulnerabilities(filtered);
+    }
     
     if (filtered.length === 0) {
-      console.log(theme.info('\nNo vulnerabilities match the severity filter.\n'));
+      if (this.options.severityFilter) {
+        console.log(theme.info('\nNo vulnerabilities match the severity filter.\n'));
+      } else {
+        console.log(theme.dim('\nAll findings have insufficient information. Use --verbose to see them.\n'));
+      }
       return;
     }
     
@@ -53,6 +62,12 @@ export class Reporter {
     for (const vuln of filtered) {
       console.log(formatVulnerability(vuln));
       console.log(theme.dim('─'.repeat(60)));
+    }
+    
+    // Show hint about hidden vulnerabilities
+    const hiddenCount = result.vulnerabilities.length - filtered.length;
+    if (hiddenCount > 0 && !this.options.verbose) {
+      console.log(theme.dim(`\n💡 ${hiddenCount} additional finding(s) with limited information hidden. Use --verbose to see all.\n`));
     }
   }
   
@@ -100,6 +115,26 @@ export class Reporter {
     return vulnerabilities.filter(v => {
       const vulnIndex = severityOrder.indexOf(v.severity);
       return vulnIndex <= minIndex;
+    });
+  }
+  
+  private filterUnhelpfulVulnerabilities(vulnerabilities: Vulnerability[]): Vulnerability[] {
+    return vulnerabilities.filter(v => {
+      // Keep all non-UNKNOWN vulnerabilities
+      if (v.severity !== 'UNKNOWN') {
+        return true;
+      }
+      
+      // For UNKNOWN, only keep if it has meaningful information
+      const hasDescription = v.description && 
+                            v.description !== 'No description available' && 
+                            v.description.trim().length > 0;
+      const hasReferences = v.references && v.references.length > 0;
+      const hasCvss = v.cvss !== undefined && v.cvss !== null;
+      const hasFixedVersion = v.fixedVersions && v.fixedVersions.length > 0;
+      const hasAffectedVersions = v.affectedVersions && v.affectedVersions !== 'Unknown';
+      
+      return hasDescription || hasReferences || hasCvss || hasFixedVersion || hasAffectedVersions;
     });
   }
 }

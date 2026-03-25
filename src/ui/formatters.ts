@@ -1,6 +1,6 @@
-import type { Vulnerability, AuditResult } from '../auditor/types.js';
+import type { AuditResult, Vulnerability } from '../auditor/types.js';
 import type { DependencyFile } from '../scanner/types.js';
-import { theme, getSeverityColor, icons } from './theme.js';
+import { getSeverityColor, icons, theme } from './theme.js';
 
 export function formatVulnerability(vuln: Vulnerability): string {
   const color = getSeverityColor(vuln.severity);
@@ -9,19 +9,30 @@ export function formatVulnerability(vuln: Vulnerability): string {
   let output = '\n';
   output += color(`${icon} ${vuln.severity} - ${vuln.id}\n`);
   output += theme.bold(`Package: `) + `${vuln.packageName}@${vuln.packageVersion}\n`;
-  output += theme.bold(`Title: `) + `${vuln.title}\n`;
+  
+  // Only show title if it's different from ID and not "No description available"
+  if (vuln.title && vuln.title !== vuln.id && vuln.title !== 'No description available') {
+    output += theme.bold(`Title: `) + `${vuln.title}\n`;
+  }
   
   if (vuln.cvss) {
     output += theme.bold(`CVSS Score: `) + `${vuln.cvss}\n`;
   }
   
-  output += theme.bold(`Affected: `) + `${vuln.affectedVersions}\n`;
+  // Only show affected versions if not "Unknown"
+  if (vuln.affectedVersions && vuln.affectedVersions !== 'Unknown') {
+    output += theme.bold(`Affected: `) + `${vuln.affectedVersions}\n`;
+  }
   
   if (vuln.fixedVersions) {
     output += theme.success(`Fixed in: ${vuln.fixedVersions}\n`);
   }
   
-  if (vuln.description && vuln.description !== vuln.title) {
+  // Only show description if it exists and is meaningful
+  if (vuln.description && 
+      vuln.description !== vuln.title && 
+      vuln.description !== 'No description available' &&
+      vuln.description.trim().length > 0) {
     const desc = vuln.description.length > 200 
       ? vuln.description.substring(0, 200) + '...' 
       : vuln.description;
@@ -35,7 +46,7 @@ export function formatVulnerability(vuln: Vulnerability): string {
     });
   }
   
-  output += theme.dim(`Source: ${vuln.source}\n`);
+  output += theme.dim(`\nSource: ${vuln.source}`);
   
   return output;
 }
@@ -47,7 +58,22 @@ export function formatSummary(result: AuditResult): string {
   output += theme.bold('═'.repeat(60)) + '\n\n';
   
   output += theme.bold(`Scanned Packages: `) + `${result.scannedPackages}\n`;
-  output += theme.bold(`Total Vulnerabilities: `) + `${result.summary.total}\n\n`;
+  
+  // Calculate meaningful vulnerabilities (exclude UNKNOWN with no info)
+  const meaningfulCount = result.summary.critical + result.summary.high + result.summary.medium + result.summary.low;
+  
+  if (meaningfulCount > 0) {
+    output += theme.bold(`Total Vulnerabilities: `) + `${meaningfulCount}\n`;
+    if (result.summary.unknown > 0) {
+      output += theme.dim(`(${result.summary.unknown} additional findings with unknown severity)\n`);
+    }
+    output += '\n';
+  } else if (result.summary.unknown > 0) {
+    output += theme.bold(`Total Vulnerabilities: `) + `${result.summary.unknown}\n`;
+    output += theme.dim(`(All findings have unknown severity)\n\n`);
+  } else {
+    output += theme.bold(`Total Vulnerabilities: `) + `0\n\n`;
+  }
   
   if (result.summary.critical > 0) {
     output += theme.critical(`${icons.critical} Critical: ${result.summary.critical}\n`);
