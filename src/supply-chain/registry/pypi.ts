@@ -81,6 +81,7 @@ export async function fetchPypiSource(
       version,
       installScripts: {},
       fileList: [],
+      fileContents: {},
       suspiciousFiles: {},
     };
   }
@@ -126,6 +127,7 @@ export async function fetchPypiSource(
     entryPoint: entryKey ? fileContents[entryKey] : undefined,
     installScripts,
     fileList,
+    fileContents,
     suspiciousFiles,
   };
 }

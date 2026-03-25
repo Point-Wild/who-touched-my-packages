@@ -22,7 +22,7 @@ export async function analyzeSupplyChain(
   options: SupplyChainOptions = {},
   onProgress?: (stage: string, done: number, total: number) => void
 ): Promise<SupplyChainReport> {
-  const apiKey = resolveApiKey(options.apiKey);
+  const apiKey = resolveApiKey(options.apiKey, options.provider);
   const model = options.model ?? DEFAULT_MODEL;
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
 

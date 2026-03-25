@@ -7,3 +7,4 @@ dist/
 *.tsbuildinfo
 docs/.astro
 docs/node_modules/
+.astro/

@@ -47,7 +47,6 @@ export interface SupplyChainOptions {
   model?: string;
   provider?: 'anthropic' | 'openrouter' | 'openai';
   concurrency?: number;
-  dryRun?: boolean;
 }
 
 export interface PackageMetadata {
@@ -75,6 +74,8 @@ export interface PackageSource {
   installScripts: Record<string, string>;
   /** All extracted file names (for pattern scanning) */
   fileList: string[];
+  /** All extracted text file contents keyed by path */
+  fileContents: Record<string, string>;
   /** Contents of suspicious files (setup.py, postinstall.js, etc.) */
   suspiciousFiles: Record<string, string>;
 }
