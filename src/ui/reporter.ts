@@ -140,12 +140,13 @@ export class Reporter {
     });
   }
   
-  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string): Promise<{ url: string; close: () => void }> {
+  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string, languageStats?: import('./html-report/types.js').LanguageStats[]): Promise<{ url: string; close: () => void }> {
     const reportData: ReportData = {
       auditResult: result,
       dependencies,
       scanPath,
       repositoryUrl,
+      languageStats,
     };
     
     const { generateAndServeReport } = await import('./html-report/new-generator.js');

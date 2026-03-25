@@ -143,6 +143,42 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
           <p>No vulnerabilities detected in your dependencies.</p>
         </div>
       )}
+
+      {data.languageStats && data.languageStats.length > 0 && (
+        <div className="chart-container">
+          <h3 style={{ marginBottom: '1rem' }}>🌐 Languages Detected</h3>
+          <div className="simple-bar-chart">
+            {data.languageStats.map((lang, idx) => {
+              const colors = [
+                'var(--accent-blue)',
+                'var(--accent-emerald)',
+                'var(--accent-purple)',
+                'var(--accent-amber)',
+                'var(--accent-rose)',
+              ];
+              const color = colors[idx % colors.length];
+
+              return (
+                <div key={idx} className="bar-item">
+                  <div className="bar-label" style={{ color }}>{lang.language}</div>
+                  <div className="bar-container">
+                    <div className="bar-fill" style={{
+                      width: `${lang.percentage}%`,
+                      background: color
+                    }}>
+                      {lang.fileCount > 0 && lang.fileCount}
+                    </div>
+                  </div>
+                  <div className="bar-value">{lang.percentage.toFixed(1)}%</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Total files analyzed: {data.languageStats.reduce((sum, lang) => sum + lang.fileCount, 0)}
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -9,6 +9,7 @@ import { GitHubDataSource, OSVDataSource } from './auditor/datasources/index.js'
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
 import { parseDependencies } from './scanner/dependency-parser.js';
 import { findDependencyFiles } from './scanner/file-finder.js';
+import { detectLanguages } from './scanner/language-detector.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -153,12 +154,22 @@ async function main() {
   if (options.html) {
     if (!options.json) {
       spinner = ora({
+        text: 'Detecting languages...',
+        color: 'cyan',
+      }).start();
+    }
+    
+    const languageStats = await detectLanguages(scanPath, options.exclude);
+    
+    if (spinner) {
+      spinner.succeed(`Detected ${languageStats.length} language(s)`);
+      spinner = ora({
         text: 'Starting report server...',
         color: 'cyan',
       }).start();
     }
     
-    const server = await reporter.generateHtmlReport(result, dependencies, scanPath, options.repo);
+    const server = await reporter.generateHtmlReport(result, dependencies, scanPath, options.repo, languageStats);
     
     if (spinner) {
       spinner.succeed(`Report server started at ${server.url}`);

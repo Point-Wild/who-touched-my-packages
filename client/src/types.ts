@@ -34,11 +34,18 @@ export interface Dependency {
   isDev?: boolean;
 }
 
+export interface LanguageStats {
+  language: string;
+  fileCount: number;
+  percentage: number;
+}
+
 export interface ReportData {
   auditResult: AuditResult;
   dependencies: Dependency[];
   scanPath: string;
   repositoryUrl?: string;
+  languageStats?: LanguageStats[];
 }
 
 export interface VulnerabilityWithPath extends Vulnerability {
