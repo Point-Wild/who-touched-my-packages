@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReportData } from '../types';
 
 interface DependenciesTabProps {
@@ -148,7 +148,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
                         {dep.ecosystem === 'npm' ? (
                           <>
                             <a
-                              href={`https://www.npmjs.com/package/${dep.name}`}
+                              href={`https://www.npmjs.com/package/${dep.name}/v/${dep.version}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="cve-link"
@@ -157,7 +157,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
                               npm
                             </a>
                             <a
-                              href={`https://socket.dev/npm/package/${dep.name}`}
+                              href={`https://socket.dev/npm/package/${dep.name}/version/${dep.version}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="cve-link"
@@ -168,7 +168,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
                           </>
                         ) : dep.ecosystem === 'pypi' ? (
                           <a
-                            href={`https://pypi.org/project/${dep.name}`}
+                            href={`https://pypi.org/project/${dep.name}/${dep.version}/`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="cve-link"
