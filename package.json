@@ -1,0 +1,45 @@
+{
+  "name": "who-touched-my-deps",
+  "version": "0.0.0",
+  "description": "A beautiful CLI tool for auditing dependencies and finding vulnerabilities",
+  "type": "module",
+  "bin": {
+    "wtmd": "./dist/index.js",
+    "who-touched-my-deps": "./dist/index.js"
+  },
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "security",
+    "audit",
+    "dependencies",
+    "vulnerabilities",
+    "npm",
+    "python",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "1.1.0",
+    "commander": "11.1.0",
+    "picocolors": "1.1.1",
+    "ora": "8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.37",
+    "typescript": "5.9.3",
+    "vite": "7.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
