@@ -2,7 +2,7 @@ import { Handle, Position } from '@xyflow/react';
 import { memo } from 'react';
 
 const NODE_WIDTH = 280;
-const NODE_HEIGHT = 120;
+const NODE_HEIGHT = 140;
 
 interface CustomNodeProps {
     data: {

@@ -367,3 +367,7 @@ tr:hover {
   background: var(--accent-amber);
   width: 5px !important;
 }
+
+.react-flow__edge {
+  pointer-events: none;
+}
