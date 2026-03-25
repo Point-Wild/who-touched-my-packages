@@ -22,7 +22,7 @@ export default defineConfig({
                 starlightImageZoom({ showCaptions: true }),
                 starlightThemeFlexoki(),
             ],
-            title: 'Who Touched My Deps?',
+            title: 'Who Touched My Packages?',
             description: 'A beautiful CLI tool for auditing dependencies and finding vulnerabilities',
             social: [
                 { label: 'GitHub', href: 'https://github.com/point-wild/who-touched-my-packages', icon: 'github' },

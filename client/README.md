@@ -1,6 +1,6 @@
-# Who Touched My Deps - React Client
+# Who Touched My Packages - React Client
 
-This is the React-based web client for the Who Touched My Deps security audit report viewer.
+This is the React-based web client for the Who Touched My Packages security audit report viewer.
 
 ## Architecture
 

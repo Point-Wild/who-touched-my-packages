@@ -45,7 +45,7 @@ wtmd
 Output:
 
 ```
-┌  🛡️ Who Touched My Deps?
+┌  🛡️ Who Touched My Packages?
 │  Scanning dependencies for vulnerabilities...
 │
 ✔ Found 1 dependency file(s)
@@ -123,7 +123,7 @@ Output:
 
 ```
 ✔ Repository cloned to /tmp/wtmd-abc123
-┌  🛡️ Who Touched My Deps?
+┌  🛡️ Who Touched My Packages?
 │  Scanning dependencies for vulnerabilities...
 │
 ✔ Found 1 dependency file(s)

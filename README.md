@@ -1,4 +1,4 @@
-# 🛡️ Who Touched My Deps?
+# 🛡️ Who Touched My Packages?
 
 A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities in your projects. Supports npm (JavaScript/TypeScript) and PyPI (Python) packages with a gorgeous terminal UI.
 
@@ -131,7 +131,7 @@ The report automatically opens in your default browser after generation and is s
 
 ### Terminal Output
 ```
-┌  🛡️ Who Touched My Deps?
+┌  🛡️ Who Touched My Packages?
   ⚠️  This program is a work in progress. Accuracy is not guaranteed.
 
 ✔ Scan complete

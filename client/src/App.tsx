@@ -67,7 +67,7 @@ export function App() {
   return (
     <div className="container">
       <div className="header">
-        <h1>🛡️ Who Touched My Deps?{repoName ? ` - ${repoName}` : ''}</h1>
+        <h1>🛡️ Who Touched My Packages?{repoName ? ` - ${repoName}` : ''}</h1>
         <div className="subtitle">
           Security Audit Report • {new Date(data.auditResult.timestamp).toLocaleString()}
         </div>
