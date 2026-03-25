@@ -55,7 +55,7 @@ export async function fetchNpmSource(
   packageName: string,
   version: string
 ): Promise<PackageSource | null> {
-  const encoded = packageName.replace('/', '%2f');
+  const encoded = encodeURIComponent(packageName);
   const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
   if (!metaRes.ok) return null;
 
