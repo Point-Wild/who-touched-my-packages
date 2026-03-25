@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import type { ReportData, VulnerabilityWithPath } from '../types';
+import { useMemo, useState } from 'react';
+import type { ReportData } from '../types';
 
 interface VulnerabilitiesTabProps {
   data: ReportData;
@@ -116,19 +116,47 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                   <td>
                     <div style={{ marginBottom: '0.5rem' }}>{vuln.title}</div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {vuln.references.map((ref, i) => (
-                        <a
-                          key={i}
-                          href={ref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="cve-link"
-                        >
-                          {ref.includes('cve.org') ? 'CVE' :
-                           ref.includes('github.com') ? 'GitHub' :
-                           ref.includes('nvd.nist.gov') ? 'NVD' : 'Link'}
-                        </a>
-                      ))}
+                      {vuln.references.map((ref, i) => {
+                        const getLabel = () => {
+                          if (ref.includes('cve.org')) return 'CVE';
+                          if (ref.includes('github.com')) return 'GitHub';
+                          if (ref.includes('nvd.nist.gov')) return 'NVD';
+                          return 'Link';
+                        };
+                        const getIdentifier = () => {
+                          try {
+                            const url = new URL(ref);
+                            const pathParts = url.pathname.split('/').filter(Boolean);
+                            if (ref.includes('github.com/advisories/')) {
+                              return pathParts[pathParts.indexOf('advisories') + 1]?.slice(0, 12);
+                            }
+                            if (ref.includes('cve.org')) {
+                              return pathParts.find(p => p.startsWith('CVE-'));
+                            }
+                            if (ref.includes('nvd.nist.gov')) {
+                              return pathParts.find(p => p.startsWith('CVE-'));
+                            }
+                            return url.hostname.replace(/^www\./, '');
+                          } catch {
+                            return null;
+                          }
+                        };
+                        const label = getLabel();
+                        const identifier = getIdentifier();
+                        const displayLabel = identifier ? `${label} · ${identifier}` : label;
+                        return (
+                          <a
+                            key={i}
+                            href={ref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="cve-link"
+                            title={ref}
+                          >
+                            {displayLabel}
+                          </a>
+                        );
+                      })}
                     </div>
                   </td>
                   <td>
