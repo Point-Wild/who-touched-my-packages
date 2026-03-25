@@ -67,7 +67,7 @@ export async function fetchNpmSource(
     if (scripts[hook]) installScripts[hook] = scripts[hook];
   }
 
-  const mainEntry = meta.main ?? 'index.js';
+  const mainEntry = (meta.main ?? 'index.js').replace(/^\.\//, '');
 
   // Download and extract the tarball
   const tarRes = await fetch(tarballUrl);
@@ -76,10 +76,13 @@ export async function fetchNpmSource(
   const NPM_TEXT_PATTERN = /\.(js|ts|mjs|cjs|py|sh|json|yml|yaml|toml|cfg|ini|txt|md)$/i;
   const { fileList, fileContents } = await downloadAndExtractTarGz(tarRes, NPM_TEXT_PATTERN);
 
-  // Find entry point
-  const entryKey = Object.keys(fileContents).find(
-    f => f === `package/${mainEntry}` || f.endsWith(`/${mainEntry}`)
-  );
+  // Find entry point — try exact match, then with .js extension
+  const entryKey = Object.keys(fileContents).find(f => {
+    const stripped = f.replace(/^package\//, '');
+    return stripped === mainEntry
+      || stripped === `${mainEntry}.js`
+      || stripped === `${mainEntry}/index.js`;
+  });
 
   // Identify suspicious files
   const suspiciousPatterns = [
@@ -118,6 +121,7 @@ export async function fetchNpmSource(
     entryPoint: entryKey ? fileContents[entryKey] : undefined,
     installScripts,
     fileList,
+    fileContents,
     suspiciousFiles,
   };
 }

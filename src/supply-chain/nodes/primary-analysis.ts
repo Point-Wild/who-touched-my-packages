@@ -31,17 +31,22 @@ export async function primaryAnalysisNode(
   }
 
   let done = 0;
+  const errors: Array<{ pkg: string; error: string }> = [];
+  let packagesNeedingLlm = 0;
 
   const results = await pMap(
     tasks,
     async ({ meta, source }) => {
       try {
         const result = await investigatePackage(meta, source, chatModel);
+        if (result.needsLlm) packagesNeedingLlm++;
         done++;
         onProgress?.(done, tasks.length);
-        return result;
-      } catch (err) {
-        console.error(`  [ERROR] ${meta.name}: ${err}`);
+        return result.findings;
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        errors.push({ pkg: meta.name, error: msg });
+        packagesNeedingLlm++;
         done++;
         onProgress?.(done, tasks.length);
         return [];
@@ -52,6 +57,21 @@ export async function primaryAnalysisNode(
 
   for (const r of results) {
     findings.push(...r);
+  }
+
+  // If every package that needed LLM analysis failed, throw so the caller knows
+  if (errors.length > 0 && errors.length >= packagesNeedingLlm) {
+    throw new Error(
+      `All ${errors.length} LLM analysis calls failed. First error: ${errors[0].error}`
+    );
+  }
+
+  // If some failed, log warnings
+  if (errors.length > 0) {
+    console.error(`  ⚠ ${errors.length}/${packagesNeedingLlm} package analyses failed:`);
+    for (const { pkg, error } of errors) {
+      console.error(`    - ${pkg}: ${error}`);
+    }
   }
 
   return findings;
@@ -66,7 +86,7 @@ async function investigatePackage(
   meta: PackageMetadata,
   source: PackageSource,
   chatModel: BaseChatModel
-): Promise<SupplyChainFinding[]> {
+): Promise<{ findings: SupplyChainFinding[]; needsLlm: boolean }> {
   const verbose = process.env.SC_VERBOSE === '1';
 
   // Phase 1: Programmatic triage
@@ -85,7 +105,7 @@ async function investigatePackage(
   }
 
   if (filesToInvestigate.length === 0) {
-    return [];
+    return { findings: [], needsLlm: false };
   }
 
   // Phase 2: Per-file LLM analysis
@@ -181,7 +201,7 @@ async function investigatePackage(
     console.log(`  [analyze:${meta.name}] complete — ${allFindings.length} findings from ${filesToInvestigate.length} files`);
   }
 
-  return allFindings;
+  return { findings: allFindings, needsLlm: true };
 }
 
 function normalizeSeverity(s: unknown): SupplyChainFinding['severity'] {
