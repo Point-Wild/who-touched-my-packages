@@ -11,6 +11,7 @@ import { findDependencyFiles } from './scanner/file-finder.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
+import { cloneRepository } from './utils/git-clone.js';
 import { Logger } from './utils/logger.js';
 
 const program = new Command();
@@ -20,6 +21,8 @@ program
   .description('A beautiful CLI tool for auditing dependencies and finding vulnerabilities')
   .version('0.1.0')
   .option('-p, --path <directory>', 'Path to scan (default: current directory)', '.')
+  .option('-r, --repo <url>', 'Git repository URL to clone and scan')
+  .option('-b, --branch <name>', 'Branch to checkout when cloning repository')
   .option('-e, --exclude <patterns...>', 'Patterns to exclude from scanning', [])
   .option('-s, --severity <level>', 'Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW)')
   .option('-f, --fail-on <level>', 'Exit with error code if vulnerabilities at or above this severity are found')
@@ -31,7 +34,40 @@ const options = program.opts();
 
 async function main() {
   const logger = new Logger(options.verbose);
-  const scanPath = resolve(cwd(), options.path);
+  
+  let scanPath: string;
+  let cleanup: (() => Promise<void>) | null = null;
+  
+  if (options.repo) {
+    if (!options.json) {
+      const spinner = ora({
+        text: `Cloning repository${options.branch ? ` (branch: ${options.branch})` : ''}...`,
+        color: 'cyan',
+      }).start();
+      
+      try {
+        const cloneResult = await cloneRepository({
+          repoUrl: options.repo,
+          branch: options.branch,
+        });
+        scanPath = cloneResult.path;
+        cleanup = cloneResult.cleanup;
+        spinner.succeed(`Repository cloned to ${scanPath}`);
+      } catch (error) {
+        spinner.fail('Failed to clone repository');
+        throw error;
+      }
+    } else {
+      const cloneResult = await cloneRepository({
+        repoUrl: options.repo,
+        branch: options.branch,
+      });
+      scanPath = cloneResult.path;
+      cleanup = cloneResult.cleanup;
+    }
+  } else {
+    scanPath = resolve(cwd(), options.path);
+  }
   
   if (!options.json) {
     clack.intro(theme.bold(`${icons.shield} Who Touched My Deps?`));
@@ -119,6 +155,10 @@ async function main() {
     }
   }
   
+  if (cleanup) {
+    await cleanup();
+  }
+  
   if (options.failOn && shouldFailOnSeverity(result.summary, options.failOn)) {
     process.exit(1);
   }
@@ -126,7 +166,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   if (!options.json) {
     clack.outro(theme.critical(`Error: ${error.message}`));
   } else {
