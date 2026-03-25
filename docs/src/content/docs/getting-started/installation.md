@@ -16,10 +16,10 @@ Install the tool globally to use it anywhere:
 npm install -g who-touched-my-packages
 ```
 
-After installation, you can use the `wtmd` or `who-touched-my-packages` command:
+After installation, you can use the `wtmp` or `who-touched-my-packages` command:
 
 ```bash
-wtmd --version
+wtmp --version
 ```
 
 ## Using npx (No Installation)
@@ -48,8 +48,8 @@ Add to your `package.json` scripts:
 ```json
 {
   "scripts": {
-    "audit": "wtmd",
-    "audit:ci": "wtmd --json --fail-on HIGH"
+    "audit": "wtmp",
+    "audit:ci": "wtmp --json --fail-on HIGH"
   }
 }
 ```
@@ -65,10 +65,10 @@ npm run audit
 Check that the tool is installed correctly:
 
 ```bash
-wtmd --version
+wtmp --version
 # Output: 0.1.0
 
-wtmd --help
+wtmp --help
 # Shows all available options
 ```
 

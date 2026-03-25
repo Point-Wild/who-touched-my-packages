@@ -26,7 +26,7 @@ npx who-touched-my-packages
 Navigate to your project and run:
 
 ```bash
-wtmd
+wtmp
 ```
 
 The tool will:
@@ -39,7 +39,7 @@ The tool will:
 
 ```bash
 cd ~/my-nodejs-app
-wtmd
+wtmp
 ```
 
 Output:
@@ -94,13 +94,13 @@ Source: OSV
 Only show high and critical vulnerabilities:
 
 ```bash
-wtmd --severity HIGH
+wtmp --severity HIGH
 ```
 
 ### Scan Specific Directory
 
 ```bash
-wtmd --path /path/to/project
+wtmp --path /path/to/project
 ```
 
 ## Scanning Remote Repositories
@@ -110,19 +110,19 @@ You can scan any Git repository without cloning it manually. The tool will autom
 ### Scan a Repository
 
 ```bash
-wtmd --repo https://github.com/user/repository
+wtmp --repo https://github.com/user/repository
 ```
 
 Example:
 
 ```bash
-wtmd --repo https://github.com/expressjs/express
+wtmp --repo https://github.com/expressjs/express
 ```
 
 Output:
 
 ```
-✔ Repository cloned to /tmp/wtmd-abc123
+✔ Repository cloned to /tmp/wtmp-abc123
 ┌  🛡️ Who Touched My Packages?
 │  Scanning dependencies for vulnerabilities...
 │
@@ -135,13 +135,13 @@ Output:
 To scan a specific branch or tag:
 
 ```bash
-wtmd --repo https://github.com/user/repository --branch develop
+wtmp --repo https://github.com/user/repository --branch develop
 ```
 
 Example:
 
 ```bash
-wtmd --repo https://github.com/expressjs/express --branch 5.x
+wtmp --repo https://github.com/expressjs/express --branch 5.x
 ```
 
 ### Combine with Other Options
@@ -150,13 +150,13 @@ You can combine repository scanning with other options:
 
 ```bash
 # Scan a repo and filter by severity
-wtmd --repo https://github.com/user/repo --severity HIGH
+wtmp --repo https://github.com/user/repo --severity HIGH
 
 # Scan a repo with JSON output
-wtmd --repo https://github.com/user/repo --json
+wtmp --repo https://github.com/user/repo --json
 
 # Scan a repo and fail on high vulnerabilities
-wtmd --repo https://github.com/user/repo --fail-on HIGH
+wtmp --repo https://github.com/user/repo --fail-on HIGH
 ```
 
 ### Use Cases for Remote Scanning
@@ -171,7 +171,7 @@ wtmd --repo https://github.com/user/repo --fail-on HIGH
 Skip certain directories:
 
 ```bash
-wtmd --exclude test fixtures examples
+wtmp --exclude test fixtures examples
 ```
 
 ### JSON Output
@@ -179,7 +179,7 @@ wtmd --exclude test fixtures examples
 Get machine-readable output:
 
 ```bash
-wtmd --json
+wtmp --json
 ```
 
 Output:
@@ -218,7 +218,7 @@ Output:
 Exit with error code if vulnerabilities are found:
 
 ```bash
-wtmd --fail-on HIGH
+wtmp --fail-on HIGH
 ```
 
 This will:
@@ -232,7 +232,7 @@ The tool automatically detects `requirements.txt` files:
 
 ```bash
 cd ~/my-python-app
-wtmd
+wtmp
 ```
 
 Output:
@@ -251,13 +251,13 @@ Output:
 For large monorepos, you might want to exclude certain directories:
 
 ```bash
-wtmd --exclude node_modules dist build .venv
+wtmp --exclude node_modules dist build .venv
 ```
 
 You can also scan remote monorepos:
 
 ```bash
-wtmd --repo https://github.com/user/monorepo --exclude examples test
+wtmp --repo https://github.com/user/monorepo --exclude examples test
 ```
 
 The tool automatically ignores common directories like:
@@ -276,7 +276,7 @@ Set a GitHub personal access token for higher API rate limits:
 
 ```bash
 export GITHUB_TOKEN=ghp_your_token_here
-wtmd
+wtmp
 ```
 
 Without a token:

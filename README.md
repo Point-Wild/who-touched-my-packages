@@ -35,49 +35,49 @@ npx who-touched-my-packages --repo https://github.com/anxolerd/dvpwa # Vulnerabl
 
 ### Basic scan (current directory)
 ```bash
-wtmd
+wtmp
 # or
 who-touched-my-packages
 ```
 
 ### Scan a specific directory
 ```bash
-wtmd --path /path/to/project
+wtmp --path /path/to/project
 ```
 
 ### Scan a remote repository
 ```bash
-wtmd --repo https://github.com/user/repository
+wtmp --repo https://github.com/user/repository
 ```
 
 ### Scan a specific branch
 ```bash
-wtmd --repo https://github.com/user/repository --branch develop
+wtmp --repo https://github.com/user/repository --branch develop
 ```
 
 ### Filter by severity
 ```bash
-wtmd --severity HIGH
+wtmp --severity HIGH
 ```
 
 ### Use terminal output instead of HTML report
 ```bash
-wtmd --no-html
+wtmp --no-html
 ```
 
 ### JSON output for CI/CD
 ```bash
-wtmd --json
+wtmp --json
 ```
 
 ### Fail on vulnerabilities (for CI/CD)
 ```bash
-wtmd --fail-on HIGH
+wtmp --fail-on HIGH
 ```
 
 ### Exclude patterns
 ```bash
-wtmd --exclude test fixtures examples
+wtmp --exclude test fixtures examples
 ```
 
 ## 📋 Command Line Options
