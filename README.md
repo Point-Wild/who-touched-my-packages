@@ -87,12 +87,17 @@ wtmp --exclude test fixtures examples
 | `--path <dir>` | `-p` | Directory to scan | Current directory |
 | `--repo <url>` | `-r` | Git repository URL to clone and scan | None |
 | `--branch <name>` | `-b` | Branch to checkout when cloning repository | Default branch |
-| `--exclude <patterns...>` | `-e` | Patterns to exclude | `[]` |
+| `--exclude <patterns...>` | `-e` | Patterns to exclude from scanning | `[]` |
 | `--severity <level>` | `-s` | Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW) | All |
 | `--fail-on <level>` | `-f` | Exit with error if vulnerabilities at or above this level are found | None |
 | `--json` | `-j` | Output results as JSON | `false` |
 | `--html` | | Generate interactive HTML report and open in browser (default) | `true` |
 | `--no-html` | | Disable HTML report generation and use terminal output | `false` |
+| `--supply-chain` | | Enable supply chain security analysis | `false` |
+| `--supply-chain-model <model>` | | LLM model to use for supply chain analysis | `claude-sonnet-4-5-20241022` |
+| `--supply-chain-provider <provider>` | | LLM provider (anthropic, openrouter, openai) | `anthropic` |
+| `--supply-chain-concurrency <number>` | | Number of concurrent LLM requests | `3` |
+| `--supply-chain-dry-run` | | Skip actual LLM calls (for testing) | `false` |
 | `--verbose` | `-v` | Verbose output | `false` |
 | `--version` | | Show version | |
 | `--help` | `-h` | Show help | |
