@@ -20,7 +20,8 @@
     "test:node": "bun src/index.ts --repo https://github.com/appsecco/dvna",
     "test:python": "bun src/index.ts --repo https://github.com/anxolerd/dvpwa",
     "test:html": "bun src/index.ts --repo https://github.com/appsecco/dvna --html",
-    "build": "npm run build:client && vite build",
+    "build": "npm run build:client && vite build && npm run postbuild",
+    "postbuild": "chmod +x dist/index.js",
     "build:client": "cd client && bun install && bun run build",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
