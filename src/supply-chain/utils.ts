@@ -1,18 +1,25 @@
 /**
  * Resolve the LLM API key from (in priority order):
  * 1. options.apiKey passed directly
- * 2. ANTHROPIC_API_KEY env var
+ * 2. Provider-specific env var (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY)
  */
-export function resolveApiKey(optionsKey?: string): string {
+export function resolveApiKey(optionsKey?: string, provider?: string): string {
   if (optionsKey) return optionsKey;
 
-  const envKey = process.env.ANTHROPIC_API_KEY;
+  const providerEnvVars: Record<string, string> = {
+    anthropic: 'ANTHROPIC_API_KEY',
+    openai: 'OPENAI_API_KEY',
+    openrouter: 'OPENROUTER_API_KEY',
+  };
+
+  const envVar = providerEnvVars[provider ?? 'anthropic'];
+  const envKey = process.env[envVar];
   if (envKey) return envKey;
 
   throw new Error(
-    'No API key found. Set one of:\n' +
-    '  1. Pass apiKey in options\n' +
-    '  2. Set ANTHROPIC_API_KEY environment variable'
+    `No API key found. Set one of:\n` +
+    `  1. Pass apiKey in options\n` +
+    `  2. Set ${envVar} environment variable`
   );
 }
 
