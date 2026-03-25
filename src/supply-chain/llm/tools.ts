@@ -94,8 +94,10 @@ const LOW_VALUE_PATH_PATTERNS = [
   /\/mocks?\//i,
   /\/fixtures?\//i,
   /\/docs?\//i,
-  /README/i,
-  /CHANGELOG/i,
+  /\/examples?\//i,
+  /\.md$/i,
+  /\.min\.js$/i,
+  /\.map$/i,
   /LICENSE/i,
   /\.ya?ml$/i,
   /\.json$/i,  // standalone JSON files (not package.json — that's boosted separately)
