@@ -1,0 +1,110 @@
+---
+title: Who Touched My Deps?
+description: A beautiful CLI tool for auditing dependencies and finding vulnerabilities
+template: splash
+hero:
+  tagline: Secure your dependencies with style 🛡️
+  actions:
+    - text: Get Started
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/knackstedt/who-touched-my-deps
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+  <Card title="Multi-Ecosystem" icon="puzzle">
+    Supports npm (package.json) and Python (requirements.txt) with more coming soon
+  </Card>
+  <Card title="Multiple Data Sources" icon="random">
+    Queries OSV and GitHub Advisory Database for comprehensive vulnerability coverage
+  </Card>
+  <Card title="Beautiful UI" icon="star">
+    Colorful, emoji-rich terminal output with automatic light/dark mode detection
+  </Card>
+  <Card title="CI/CD Ready" icon="rocket">
+    JSON output and exit codes make it perfect for automation pipelines
+  </Card>
+  <Card title="Severity Filtering" icon="magnifier">
+    Filter vulnerabilities by severity level (CRITICAL, HIGH, MEDIUM, LOW)
+  </Card>
+  <Card title="Recursive Scanning" icon="document">
+    Automatically finds all dependency files in your project tree
+  </Card>
+  <Card title="Fast & Efficient" icon="approve-check">
+    Parallel API requests and smart caching for quick scans
+  </Card>
+  <Card title="Extensible" icon="seti:config">
+    Easy to add new data sources and package managers
+  </Card>
+</CardGrid>
+
+## Quick Start
+
+Install globally:
+
+```bash
+npm install -g who-touched-my-deps
+```
+
+Scan your project:
+
+```bash
+wtmd
+```
+
+That's it! The tool will recursively scan your project and report any vulnerabilities 🎉
+
+## Example Output
+
+```
+🛡️ Who Touched My Deps?
+  Scanning dependencies for vulnerabilities...
+
+✔ Found 2 dependency file(s)
+✔ Parsed 16 package(s)
+
+════════════════════════════════════════════════════════════
+🛡️ Security Audit Summary
+════════════════════════════════════════════════════════════
+
+Scanned Packages: 16
+Total Vulnerabilities: 3
+
+🔴 Critical: 1
+🟠 High: 2
+
+════════════════════════════════════════════════════════════
+```
+
+## Why Who Touched My Deps?
+
+- **Beautiful UX**: Security tools should be pleasant to use
+- **Multiple Sources**: Don't rely on a single vulnerability database
+- **Extensible**: Easy to add new data sources and package managers
+- **Fast**: Optimized for large monorepos
+- **Free**: No API keys or paid plans required
+
+## Next Steps
+
+<CardGrid>
+  <Card title="Installation" icon="rocket">
+    [Install the tool](/getting-started/installation/) and run your first scan
+  </Card>
+  <Card title="Quick Start" icon="open-book">
+    Learn the [basics](/quick-start/) and scan your first project
+  </Card>
+  <Card title="CI/CD Integration" icon="seti:config">
+    Set up [automated scanning](/usage/ci-cd/) in your pipelines
+  </Card>
+  <Card title="Data Sources" icon="puzzle">
+    Learn about the [vulnerability databases](/data-sources/overview/) we use
+  </Card>
+</CardGrid>
