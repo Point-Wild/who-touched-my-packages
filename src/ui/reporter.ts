@@ -9,6 +9,7 @@ export interface ReporterOptions {
   severityFilter?: string;
   verbose?: boolean;
   html?: boolean;
+  supplyChain?: boolean;
 }
 
 export class Reporter {
@@ -26,7 +27,12 @@ export class Reporter {
     console.log(formatFileList(files));
   }
   
-  reportResults(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+  reportResults(
+    result: AuditResult,
+    files?: DependencyFile[],
+    dependencies?: Dependency[],
+    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport
+  ): void {
     if (this.options.json) {
       this.reportJson(result);
       return;
@@ -197,7 +203,15 @@ export class Reporter {
     });
   }
   
-  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string, languageStats?: import('./html-report/types.js').LanguageStats[], dependencyEdges?: DependencyEdge[]): Promise<{ url: string; close: () => void }> {
+  async generateHtmlReport(
+    result: AuditResult,
+    dependencies: Dependency[],
+    scanPath: string,
+    repositoryUrl?: string,
+    languageStats?: import('./html-report/types.js').LanguageStats[],
+    dependencyEdges?: DependencyEdge[],
+    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport
+  ): Promise<{ url: string; close: () => void }> {
     const reportData: ReportData = {
       auditResult: result,
       dependencies,

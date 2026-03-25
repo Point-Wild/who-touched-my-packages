@@ -12,6 +12,7 @@ import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency
 import { findDependencyFiles } from './scanner/file-finder.js';
 import { detectLanguages } from './scanner/language-detector.js';
 import type { Dependency, DependencyEdge } from './scanner/types.js';
+import { analyzeSupplyChain, type SupplyChainReport } from './supply-chain/index.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -34,6 +35,12 @@ program
   .option('--html', 'Generate HTML report and open in browser (default)', true)
   .option('--no-html', 'Disable HTML report generation')
   .option('-v, --verbose', 'Verbose output', false)
+  .option('--supply-chain', 'Enable supply chain security analysis', false)
+  .option('--supply-chain-api-key <key>', 'API key for LLM analysis (or set ANTHROPIC_API_KEY env var)')
+  .option('--supply-chain-model <model>', 'LLM model to use for supply chain analysis', 'claude-sonnet-4-5-20241022')
+  .option('--supply-chain-provider <provider>', 'LLM provider (anthropic, openrouter, openai)', 'anthropic')
+  .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', '3')
+  .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
   .parse();
 
 const options = program.opts();
@@ -113,6 +120,7 @@ async function main() {
     severityFilter: options.severity,
     verbose: options.verbose,
     html: options.html,
+    supplyChain: options.supplyChain,
   });
   
   // Build dependency trees for graph visualization
@@ -181,6 +189,38 @@ async function main() {
   const checker = new VulnerabilityChecker(dataSources);
   const result = await checker.checkDependencies(dependencies);
   
+  // Run supply chain analysis if enabled
+  let supplyChainReport: SupplyChainReport | undefined;
+  if (options.supplyChain) {
+    if (spinner) {
+      spinner.text = 'Running supply chain security analysis...';
+    }
+    
+    try {
+      supplyChainReport = await analyzeSupplyChain(allDependencies, {
+        apiKey: options.supplyChainApiKey,
+        model: options.supplyChainModel,
+        provider: options.supplyChainProvider,
+        concurrency: parseInt(options.supplyChainConcurrency, 10),
+        dryRun: options.supplyChainDryRun,
+      }, (stage, done, total) => {
+        if (spinner) {
+          spinner.text = `Supply chain analysis: ${stage} (${done}/${total})...`;
+        }
+      });
+      
+      if (spinner) {
+        spinner.succeed('Supply chain analysis complete');
+      }
+    } catch (error: any) {
+      if (spinner) {
+        spinner.fail(`Supply chain analysis failed: ${error.message}`);
+      } else if (options.verbose) {
+        console.error(`Supply chain analysis error: ${error.message}`);
+      }
+    }
+  }
+  
   if (spinner) {
     spinner.succeed('Scan complete');
   }
@@ -194,7 +234,7 @@ async function main() {
     }
     
     const languageStats = await detectLanguages(scanPath, options.exclude);
-    const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges);
+    const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges, supplyChainReport);
     
     if (spinner) {
       spinner.succeed('HTML report generated');
@@ -227,7 +267,7 @@ async function main() {
     // Don't exit - keep server running
     return;
   } else {
-    reporter.reportResults(result, files, dependencies);
+    reporter.reportResults(result, files, dependencies, supplyChainReport);
   }
   
   if (cleanup) {
@@ -235,6 +275,11 @@ async function main() {
   }
   
   if (options.failOn && shouldFailOnSeverity(result.summary, options.failOn)) {
+    process.exit(1);
+  }
+  
+  // Also fail on supply chain findings if fail-on is set and there are critical/high findings
+  if (options.failOn && supplyChainReport && shouldFailOnSeverity(supplyChainReport.summary, options.failOn)) {
     process.exit(1);
   }
   

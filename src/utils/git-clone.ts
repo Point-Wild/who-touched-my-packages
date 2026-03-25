@@ -1,7 +1,7 @@
+import { exec } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
@@ -17,7 +17,7 @@ export interface CloneResult {
 }
 
 export async function cloneRepository(options: CloneOptions): Promise<CloneResult> {
-  const tempDir = await mkdtemp(join(tmpdir(), 'wtmd-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'wtmp-'));
   
   try {
     const cloneArgs = ['clone'];
