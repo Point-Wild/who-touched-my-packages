@@ -5,6 +5,7 @@ A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities
 ## ✨ Features
 
 - 🔍 **Recursive scanning** - Finds all `package.json` and `requirements.txt` files in your project
+- 🐙 **Remote repository scanning** - Clone and scan any Git repository directly
 - 🌐 **Multiple data sources** - Queries OSV and GitHub Advisory Database for comprehensive coverage
 - 🎨 **Beautiful UI** - Colorful, emoji-rich terminal output with light/dark mode detection
 - 📊 **Detailed reports** - Shows severity, CVSS scores, affected versions, and fix information
@@ -39,6 +40,16 @@ who-touched-my-deps
 wtmd --path /path/to/project
 ```
 
+### Scan a remote repository
+```bash
+wtmd --repo https://github.com/user/repository
+```
+
+### Scan a specific branch
+```bash
+wtmd --repo https://github.com/user/repository --branch develop
+```
+
 ### Filter by severity
 ```bash
 wtmd --severity HIGH
@@ -64,6 +75,8 @@ wtmd --exclude test fixtures examples
 | Option | Alias | Description | Default |
 |--------|-------|-------------|---------|
 | `--path <dir>` | `-p` | Directory to scan | Current directory |
+| `--repo <url>` | `-r` | Git repository URL to clone and scan | None |
+| `--branch <name>` | `-b` | Branch to checkout when cloning repository | Default branch |
 | `--exclude <patterns...>` | `-e` | Patterns to exclude | `[]` |
 | `--severity <level>` | `-s` | Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW) | All |
 | `--fail-on <level>` | `-f` | Exit with error if vulnerabilities at or above this level are found | None |

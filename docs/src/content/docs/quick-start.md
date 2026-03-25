@@ -103,6 +103,69 @@ wtmd --severity HIGH
 wtmd --path /path/to/project
 ```
 
+## Scanning Remote Repositories
+
+You can scan any Git repository without cloning it manually. The tool will automatically clone it to a temporary directory, scan it, and clean up afterwards.
+
+### Scan a Repository
+
+```bash
+wtmd --repo https://github.com/user/repository
+```
+
+Example:
+
+```bash
+wtmd --repo https://github.com/expressjs/express
+```
+
+Output:
+
+```
+✔ Repository cloned to /tmp/wtmd-abc123
+┌  🛡️ Who Touched My Deps?
+│  Scanning dependencies for vulnerabilities...
+│
+✔ Found 1 dependency file(s)
+✔ Parsed 42 package(s)
+```
+
+### Scan a Specific Branch
+
+To scan a specific branch or tag:
+
+```bash
+wtmd --repo https://github.com/user/repository --branch develop
+```
+
+Example:
+
+```bash
+wtmd --repo https://github.com/expressjs/express --branch 5.x
+```
+
+### Combine with Other Options
+
+You can combine repository scanning with other options:
+
+```bash
+# Scan a repo and filter by severity
+wtmd --repo https://github.com/user/repo --severity HIGH
+
+# Scan a repo with JSON output
+wtmd --repo https://github.com/user/repo --json
+
+# Scan a repo and fail on high vulnerabilities
+wtmd --repo https://github.com/user/repo --fail-on HIGH
+```
+
+### Use Cases for Remote Scanning
+
+- **Security audits** - Quickly audit third-party dependencies before using a library
+- **Due diligence** - Check dependencies of projects you're considering adopting
+- **CI/CD** - Scan repositories as part of your pipeline without checking them out
+- **Monitoring** - Regularly scan important dependencies for new vulnerabilities
+
 ### Exclude Directories
 
 Skip certain directories:
@@ -189,6 +252,12 @@ For large monorepos, you might want to exclude certain directories:
 
 ```bash
 wtmd --exclude node_modules dist build .venv
+```
+
+You can also scan remote monorepos:
+
+```bash
+wtmd --repo https://github.com/user/monorepo --exclude examples test
 ```
 
 The tool automatically ignores common directories like:
