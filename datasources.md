@@ -8,6 +8,7 @@ This document lists all vulnerability data sources that can be integrated into *
 - **Provider**: Google
 - **URL**: https://osv.dev
 - **API**: https://api.osv.dev/v1/querybatch
+- **License**: https://www.apache.org/licenses/LICENSE-2.0
 - **Coverage**: npm, PyPI, Go, Rust, Maven, NuGet, and more
 - **Rate Limits**: No authentication required, generous rate limits
 - **Cost**: Free
@@ -25,6 +26,7 @@ This document lists all vulnerability data sources that can be integrated into *
 - **Provider**: GitHub
 - **URL**: https://github.com/advisories
 - **API**: https://api.github.com/graphql
+- **License**: https://creativecommons.org/licenses/by/4.0/
 - **Coverage**: npm, PyPI, Maven, NuGet, Composer, Go, Rust
 - **Rate Limits**: 5,000 requests/hour (authenticated), 60/hour (unauthenticated)
 - **Authentication**: Optional GITHUB_TOKEN environment variable
