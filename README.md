@@ -9,7 +9,8 @@ A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities
 - 🌐 **Multiple data sources** - Queries OSV and GitHub Advisory Database for comprehensive coverage
 - 🎨 **Beautiful UI** - Colorful, emoji-rich terminal output with light/dark mode detection
 - 📊 **Detailed reports** - Shows severity, CVSS scores, affected versions, and fix information
-- 🔧 **Flexible filtering** - Filter by severity level
+- 📄 **Interactive HTML reports** - Beautiful HTML reports with charts, tables, and dependency graphs (default output)
+- 🎯 **Flexible filtering** - Filter by severity level
 - 🤖 **CI/CD ready** - JSON output and exit codes for automation
 - ⚡ **Fast** - Parallel API requests and efficient scanning
 - 🔌 **Extensible** - Easy to add new data sources and package managers
@@ -55,6 +56,11 @@ wtmd --repo https://github.com/user/repository --branch develop
 wtmd --severity HIGH
 ```
 
+### Use terminal output instead of HTML report
+```bash
+wtmd --no-html
+```
+
 ### JSON output for CI/CD
 ```bash
 wtmd --json
@@ -81,9 +87,41 @@ wtmd --exclude test fixtures examples
 | `--severity <level>` | `-s` | Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW) | All |
 | `--fail-on <level>` | `-f` | Exit with error if vulnerabilities at or above this level are found | None |
 | `--json` | `-j` | Output results as JSON | `false` |
+| `--html` | | Generate interactive HTML report and open in browser (default) | `true` |
+| `--no-html` | | Disable HTML report generation and use terminal output | `false` |
 | `--verbose` | `-v` | Verbose output | `false` |
 | `--version` | | Show version | |
 | `--help` | `-h` | Show help | |
+
+## 📄 HTML Reports (Default Output)
+
+By default, the tool generates an interactive HTML report that opens automatically in your browser. The report includes three tabs:
+
+### Overview Tab
+- **Statistics tiles** showing total vulnerabilities by severity
+- **Pie chart** displaying severity distribution
+- **Bar chart** showing vulnerability counts
+- Summary of scanned packages
+
+### Vulnerabilities Tab
+- **Searchable table** of all detected vulnerabilities
+- **Filter by severity** (Critical, High, Medium, Low, Unknown)
+- **VSCode links** to open affected files directly in your editor
+- **CVE/CVSS links** to external vulnerability databases
+- Detailed information including:
+  - Vulnerability ID and title
+  - Package name and version
+  - CVSS score
+  - File paths where the vulnerable package is used
+  - Links to references (CVE, GitHub, NVD)
+
+### Dependency Graph Tab
+- **Interactive visualization** of your dependency tree
+- **Highlighted vulnerable packages** in red
+- **Zoom and pan** controls
+- Based on the same graph technology as [bungraph](https://github.com/knackstedt/bungraph)
+
+The report automatically opens in your default browser after generation and is saved to your system's temp directory.
 
 ## 🎨 Output Examples
 

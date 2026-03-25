@@ -18,6 +18,7 @@
     "dev": "vite build --watch",
     "test:node": "bun src/index.ts --repo https://github.com/appsecco/dvna",
     "test:python": "bun src/index.ts --repo https://github.com/anxolerd/dvpwa",
+    "test:html": "bun src/index.ts --repo https://github.com/appsecco/dvna --html",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
@@ -37,10 +38,20 @@
     "@clack/prompts": "1.1.0",
     "commander": "11.1.0",
     "picocolors": "1.1.1",
-    "ora": "8.2.0"
+    "ora": "8.2.0",
+    "open": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "20.19.37",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@xyflow/react": "^12.10.1",
+    "elkjs": "^0.11.1",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^2.15.0",
     "typescript": "5.9.3",
     "vite": "7.3.1"
   },

@@ -1,12 +1,15 @@
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
-import type { DependencyFile } from '../scanner/types.js';
+import type { Dependency, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatSummary, formatVulnerability } from './formatters.js';
+import { generateHtmlReport } from './html-report/generator.js';
+import type { ReportData } from './html-report/types.js';
 import { theme } from './theme.js';
 
 export interface ReporterOptions {
   json?: boolean;
   severityFilter?: string;
   verbose?: boolean;
+  html?: boolean;
 }
 
 export class Reporter {
@@ -136,5 +139,16 @@ export class Reporter {
       
       return hasDescription || hasReferences || hasCvss || hasFixedVersion || hasAffectedVersions;
     });
+  }
+  
+  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string): Promise<string> {
+    const reportData: ReportData = {
+      auditResult: result,
+      dependencies,
+      scanPath,
+      repositoryUrl,
+    };
+    
+    return await generateHtmlReport(reportData);
   }
 }

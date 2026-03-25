@@ -2,6 +2,7 @@ import * as clack from '@clack/prompts';
 import { Command } from 'commander';
 import { resolve } from 'node:path';
 import { cwd } from 'node:process';
+import open from 'open';
 import ora from 'ora';
 
 import { GitHubDataSource, OSVDataSource } from './auditor/datasources/index.js';
@@ -27,6 +28,8 @@ program
   .option('-s, --severity <level>', 'Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW)')
   .option('-f, --fail-on <level>', 'Exit with error code if vulnerabilities at or above this severity are found')
   .option('-j, --json', 'Output results as JSON', false)
+  .option('--html', 'Generate HTML report and open in browser (default)', true)
+  .option('--no-html', 'Disable HTML report generation')
   .option('-v, --verbose', 'Verbose output', false)
   .parse();
 
@@ -71,6 +74,7 @@ async function main() {
   
   if (!options.json) {
     clack.intro(theme.bold(`${icons.shield} Who Touched My Deps?`));
+    console.log(theme.dim('  ⚠️  This program is a work in progress. Accuracy is not guaranteed.\n'));
     console.log(theme.dim('  Scanning dependencies for vulnerabilities...\n'));
   }
   
@@ -100,13 +104,14 @@ async function main() {
     json: options.json,
     severityFilter: options.severity,
     verbose: options.verbose,
+    html: options.html,
   });
   
-  if (!options.json) {
+  if (!options.json && !options.html) {
     reporter.reportFiles(files);
   }
   
-  if (!options.json) {
+  if (!options.json && !options.html) {
     spinner = ora({
       text: 'Parsing dependencies...',
       color: 'cyan',
@@ -120,13 +125,13 @@ async function main() {
   }
   
   if (dependencies.length === 0) {
-    if (!options.json) {
+    if (!options.json && !options.html) {
       clack.outro(theme.dim('No dependencies found.'));
     }
     process.exit(0);
   }
   
-  if (!options.json) {
+  if (!options.json && !options.html) {
     spinner = ora({
       text: 'Checking for vulnerabilities (OSV + GitHub)...',
       color: 'cyan',
@@ -145,13 +150,38 @@ async function main() {
     spinner.stop();
   }
   
-  reporter.reportResults(result);
-  
-  if (!options.json) {
-    if (result.summary.total === 0) {
-      clack.outro(theme.success(`${icons.success} All clear! No vulnerabilities found.`));
-    } else {
-      clack.outro(theme.dim('Scan complete.'));
+  if (options.html) {
+    if (!options.json) {
+      spinner = ora({
+        text: 'Generating HTML report...',
+        color: 'cyan',
+      }).start();
+    }
+    
+    const reportPath = await reporter.generateHtmlReport(result, dependencies, scanPath, options.repo);
+    
+    if (spinner) {
+      spinner.succeed(`HTML report generated: ${reportPath}`);
+    }
+    
+    if (!options.json) {
+      console.log(theme.info(`\n📄 Opening report in browser...\n`));
+    }
+    
+    await open(reportPath);
+    
+    if (!options.json) {
+      clack.outro(theme.success(`${icons.success} Report opened in browser!`));
+    }
+  } else {
+    reporter.reportResults(result);
+    
+    if (!options.json) {
+      if (result.summary.total === 0) {
+        clack.outro(theme.success(`${icons.success} All clear! No vulnerabilities found.`));
+      } else {
+        clack.outro(theme.dim('Scan complete.'));
+      }
     }
   }
   

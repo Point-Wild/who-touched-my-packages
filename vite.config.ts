@@ -20,6 +20,7 @@ export default defineConfig({
         '@clack/prompts',
         'picocolors',
         'ora',
+        'open',
       ],
       output: {
         banner: '#!/usr/bin/env node',
