@@ -16,6 +16,8 @@
   ],
   "scripts": {
     "dev": "vite build --watch",
+    "test:node": "bun src/index.ts --repo https://github.com/appsecco/dvna",
+    "test:python": "bun src/index.ts --repo https://github.com/anxolerd/dvpwa",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
