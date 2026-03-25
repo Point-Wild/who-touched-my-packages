@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "who-touched-my-deps",
+      "name": "who-touched-my-packages",
       "dependencies": {
         "@clack/prompts": "1.1.0",
         "commander": "11.1.0",

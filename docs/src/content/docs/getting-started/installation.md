@@ -13,10 +13,10 @@ description: How to install Who Touched My Deps
 Install the tool globally to use it anywhere:
 
 ```bash
-npm install -g who-touched-my-deps
+npm install -g who-touched-my-packages
 ```
 
-After installation, you can use the `wtmd` or `who-touched-my-deps` command:
+After installation, you can use the `wtmd` or `who-touched-my-packages` command:
 
 ```bash
 wtmd --version
@@ -27,7 +27,7 @@ wtmd --version
 Run the tool directly without installing:
 
 ```bash
-npx who-touched-my-deps
+npx who-touched-my-packages
 ```
 
 This is useful for:
@@ -40,7 +40,7 @@ This is useful for:
 Install as a dev dependency in your project:
 
 ```bash
-npm install --save-dev who-touched-my-deps
+npm install --save-dev who-touched-my-packages
 ```
 
 Add to your `package.json` scripts:

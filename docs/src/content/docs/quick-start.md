@@ -10,13 +10,13 @@ This guide will walk you through scanning your first project for vulnerabilities
 First, install the tool globally:
 
 ```bash
-npm install -g who-touched-my-deps
+npm install -g who-touched-my-packages
 ```
 
 Or use it directly with npx:
 
 ```bash
-npx who-touched-my-deps
+npx who-touched-my-packages
 ```
 
 ## Basic Usage

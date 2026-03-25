@@ -18,13 +18,13 @@ A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities
 ## 📦 Installation
 
 ```bash
-npm install -g who-touched-my-deps
+npm install -g who-touched-my-packages
 ```
 
 Or use directly with npx:
 
 ```bash
-npx who-touched-my-deps
+npx who-touched-my-packages
 ```
 
 ## 🚀 Usage
@@ -33,7 +33,7 @@ npx who-touched-my-deps
 ```bash
 wtmd
 # or
-who-touched-my-deps
+who-touched-my-packages
 ```
 
 ### Scan a specific directory
@@ -127,38 +127,82 @@ The report automatically opens in your default browser after generation and is s
 
 ### Terminal Output
 ```
-🛡️ Who Touched My Deps?
-  Scanning dependencies for vulnerabilities...
+┌  🛡️ Who Touched My Deps?
+  ⚠️  This program is a work in progress. Accuracy is not guaranteed.
 
-✔ Found 3 dependency file(s)
-✔ Parsed 45 package(s)
+✔ Scan complete
+
+📄 Scanned Files (3):
+────────────────────────────────────────
+📦 client/package.json
+📦 docs/package.json  
+📦 package.json
 
 ════════════════════════════════════════════════════════════
-🛡️ Security Audit Summary
+🛡️ Security Audit Results
 ════════════════════════════════════════════════════════════
 
-Scanned Packages: 45
-Total Vulnerabilities: 3
+Vulnerabilities Found: 20 (+10 unknown severity)
 
-🔴 Critical: 1
-🟠 High: 2
+� Critical: 13
+⚠️  High: 7
+⚡ Medium: 8
 
 ════════════════════════════════════════════════════════════
 
 📋 Vulnerability Details:
 ────────────────────────────────────────────────────────────
 
-🔴 CRITICAL - CVE-2023-12345
+� CRITICAL - CVE-2021-23337
 Package: lodash@4.17.20
-Title: Prototype Pollution in lodash
-CVSS Score: 9.8
-Affected: >=4.0.0 <4.17.21
+Title: Command Injection in lodash
+CVSS Score: 7.2
+Affected: >=0 <4.17.21
 Fixed in: 4.17.21
 
 References:
-  • https://nvd.nist.gov/vuln/detail/CVE-2023-12345
-  • https://github.com/advisories/GHSA-xxxx-yyyy-zzzz
+  • https://nvd.nist.gov/vuln/detail/CVE-2021-23337
+  • https://github.com/advisories/GHSA-35jh-r3h4-6jhm
+
 Source: OSV
+────────────────────────────────────────────────────────────
+
+🟡 MEDIUM - GHSA-5wg4-74h6-q47v
+Package: bcrypt@1.0.3
+Title: Integer Overflow in bcrypt
+CVSS Score: 5.9
+Affected: >=0 <5.0.0
+Fixed in: 5.0.0
+
+In bcrypt (npm package) before version 5.0.0, data is truncated 
+wrong when its length is greater than 255 bytes.
+
+References:
+  • https://nvd.nist.gov/vuln/detail/CVE-2020-7689
+  • https://github.com/kelektiv/node.bcrypt.js/issues/776
+
+Source: OSV
+────────────────────────────────────────────────────────────
+
+💡 12 additional finding(s) with limited information hidden. Use --verbose to see all.
+
+════════════════════════════════════════════════════════════
+📊 Final Summary
+════════════════════════════════════════════════════════════
+Files Scanned: 3
+Packages Analyzed: 45
+Vulnerabilities Found: 30
+
+By Severity:
+  🚨 Critical: 13
+  ⚠️  High: 7
+  ⚡ Medium: 8
+  💡 Low: 0
+  ❓ Unknown: 2
+
+════════════════════════════════════════════════════════════
+
+❌ 20 critical/high severity vulnerabilities require immediate attention!
 ```
 
 ### JSON Output
@@ -216,27 +260,27 @@ See [datasources.md](./datasources.md) for details on all current and planned da
 ### GitHub Actions
 ```yaml
 - name: Audit Dependencies
-  run: npx who-touched-my-deps --json --fail-on HIGH
+  run: npx who-touched-my-packages --json --fail-on HIGH
 ```
 
 ### GitLab CI
 ```yaml
 audit:
   script:
-    - npx who-touched-my-deps --json --fail-on HIGH
+    - npx who-touched-my-packages --json --fail-on HIGH
 ```
 
 ### Jenkins
 ```groovy
-sh 'npx who-touched-my-deps --json --fail-on HIGH'
+sh 'npx who-touched-my-packages --json --fail-on HIGH'
 ```
 
 ## 🛠️ Development
 
 ### Build from source
 ```bash
-git clone https://github.com/yourusername/who-touched-my-deps.git
-cd who-touched-my-deps
+git clone https://github.com/yourusername/who-touched-my-packages.git
+cd who-touched-my-packages
 npm install
 npm run build
 npm link

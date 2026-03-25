@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "who-touched-my-deps-client",
+      "name": "who-touched-my-packages-client",
       "dependencies": {
         "@xyflow/react": "^12.10.1",
         "classnames": "^2.5.1",

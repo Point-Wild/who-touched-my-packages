@@ -21,7 +21,7 @@ import { Logger } from './utils/logger.js';
 const program = new Command();
 
 program
-  .name('who-touched-my-deps')
+  .name('who-touched-my-packages')
   .description('A beautiful CLI tool for auditing dependencies and finding vulnerabilities')
   .version('0.1.0')
   .option('-p, --path <directory>', 'Path to scan (default: current directory)', '.')

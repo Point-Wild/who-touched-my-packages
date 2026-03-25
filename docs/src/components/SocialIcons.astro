@@ -1,6 +1,6 @@
 ---
 // Import the default SocialIcons component from Starlight
-import Default from '@astrojs/starlight/components/SocialIcons.astro';
+import Default from "@astrojs/starlight/components/SocialIcons.astro";
 ---
 
 <!-- Render the default social icons (GitHub, etc.) -->
@@ -91,17 +91,17 @@ import Default from '@astrojs/starlight/components/SocialIcons.astro';
 
 <script>
   // Client-side script for copy functionality
-  document.addEventListener('DOMContentLoaded', () => {
-    const copyBtn = document.querySelector('.llms-copy-btn');
-    
+  document.addEventListener("DOMContentLoaded", () => {
+    const copyBtn = document.querySelector(".llms-copy-btn");
+
     if (!copyBtn) return;
 
-    copyBtn.addEventListener('click', async (e) => {
+    copyBtn.addEventListener("click", async (e) => {
       e.preventDefault();
-      
-      const baseUrl = 'https://knackstedt.github.io/shokupan';
+
+      const baseUrl = "https://Point-Wild.github.io/who-touched-my-packages/";
       const llmsUrl = `${baseUrl}/llms.txt`;
-      
+
       // Text to copy - includes helpful prompt for the user
       const textToCopy = `Please read and use the context from this Shokupan framework documentation:
 ${llmsUrl}
@@ -110,21 +110,21 @@ After reading, you can help me with questions about Shokupan.`;
 
       try {
         await navigator.clipboard.writeText(textToCopy);
-        
+
         // Show success tooltip
-        copyBtn.setAttribute('data-tooltip', 'Copied! ✓');
-        
+        copyBtn.setAttribute("data-tooltip", "Copied! ✓");
+
         // Remove tooltip after 2 seconds
         setTimeout(() => {
-          copyBtn.removeAttribute('data-tooltip');
+          copyBtn.removeAttribute("data-tooltip");
         }, 2000);
       } catch (err) {
-        console.error('Failed to copy:', err);
-        
+        console.error("Failed to copy:", err);
+
         // Show error tooltip
-        copyBtn.setAttribute('data-tooltip', 'Failed to copy');
+        copyBtn.setAttribute("data-tooltip", "Failed to copy");
         setTimeout(() => {
-          copyBtn.removeAttribute('data-tooltip');
+          copyBtn.removeAttribute("data-tooltip");
         }, 2000);
       }
     });

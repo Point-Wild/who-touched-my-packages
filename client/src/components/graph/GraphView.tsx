@@ -29,7 +29,7 @@ export interface GraphViewProps {
 function FitViewEffect({ signal }: { signal?: number }) {
     const { fitView } = useReactFlow();
     useEffect(() => {
-        if (signal == null || signal === 0) return;
+        if (signal == null || signal < 1) return;
         // Wait for nodes to be fully rendered before fitting view
         const id = setTimeout(() => {
             fitView({ 
@@ -39,7 +39,7 @@ function FitViewEffect({ signal }: { signal?: number }) {
                 minZoom: 0.1,
                 includeHiddenNodes: false
             });
-        }, 300);
+        }, 100);
         return () => clearTimeout(id);
     }, [signal, fitView]);
     return null;

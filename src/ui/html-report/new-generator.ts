@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export async function generateAndServeReport(data: ReportData): Promise<{ url: string; close: () => void }> {
-  const reportDir = join(tmpdir(), 'who-touched-my-deps-reports');
+  const reportDir = join(tmpdir(), 'who-touched-my-packages-reports');
   mkdirSync(reportDir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

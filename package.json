@@ -1,11 +1,11 @@
 {
-  "name": "who-touched-my-deps",
+  "name": "who-touched-my-packages",
   "version": "0.0.5",
   "description": "A beautiful CLI tool for auditing dependencies and finding vulnerabilities",
   "type": "module",
   "bin": {
-    "wtmd": "dist/index.js",
-    "who-touched-my-deps": "dist/index.js"
+    "wtmp": "dist/index.js",
+    "who-touched-my-packages": "dist/index.js"
   },
   "repository": {
     "url": "git+https://github.com/Point-Wild/who-touched-my-packages.git"
