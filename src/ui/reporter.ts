@@ -1,5 +1,5 @@
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
-import type { Dependency, DependencyFile } from '../scanner/types.js';
+import type { Dependency, DependencyEdge, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatSummary, formatVulnerability } from './formatters.js';
 import type { ReportData } from './html-report/types.js';
 import { theme } from './theme.js';
@@ -140,13 +140,14 @@ export class Reporter {
     });
   }
   
-  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string, languageStats?: import('./html-report/types.js').LanguageStats[]): Promise<{ url: string; close: () => void }> {
+  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string, languageStats?: import('./html-report/types.js').LanguageStats[], dependencyEdges?: DependencyEdge[]): Promise<{ url: string; close: () => void }> {
     const reportData: ReportData = {
       auditResult: result,
       dependencies,
       scanPath,
       repositoryUrl,
       languageStats,
+      dependencyEdges,
     };
     
     const { generateAndServeReport } = await import('./html-report/new-generator.js');

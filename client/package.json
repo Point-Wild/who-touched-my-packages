@@ -11,7 +11,10 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "monaco-editor": "^0.45.0"
+    "monaco-editor": "^0.45.0",
+    "@xyflow/react": "^12.10.1",
+    "elkjs": "^0.11.1",
+    "classnames": "^2.5.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { OverviewTab } from './components/OverviewTab';
-import { VulnerabilitiesTab } from './components/VulnerabilitiesTab';
+import { useEffect, useState } from 'react';
 import { DependenciesTab } from './components/DependenciesTab';
+import { GraphTab } from './components/GraphTab';
+import { OverviewTab } from './components/OverviewTab';
 import { PinningTab } from './components/PinningTab';
+import { VulnerabilitiesTab } from './components/VulnerabilitiesTab';
 import type { ReportData } from './types';
 
 export function App() {
@@ -104,6 +105,12 @@ export function App() {
         >
           📌 Pinning Issues
         </button>
+        <button
+          className={`tab ${activeTab === 'graph' ? 'active' : ''}`}
+          onClick={() => setActiveTab('graph')}
+        >
+          🕸️ Graph
+        </button>
       </div>
 
       <div className={`tab-content ${activeTab === 'overview' ? 'active' : ''}`}>
@@ -120,6 +127,10 @@ export function App() {
 
       <div className={`tab-content ${activeTab === 'pinning' ? 'active' : ''}`}>
         <PinningTab data={data} />
+      </div>
+
+      <div className={`tab-content ${activeTab === 'graph' ? 'active' : ''}`}>
+        <GraphTab data={data} />
       </div>
     </div>
   );

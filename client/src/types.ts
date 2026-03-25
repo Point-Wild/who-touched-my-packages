@@ -32,6 +32,14 @@ export interface Dependency {
   ecosystem: 'npm' | 'pypi';
   file: string;
   isDev?: boolean;
+  depth?: number;
+  paths?: string[][];
+}
+
+export interface DependencyEdge {
+  source: string;
+  target: string;
+  type: 'dependency' | 'dev';
 }
 
 export interface LanguageStats {
@@ -46,6 +54,7 @@ export interface ReportData {
   scanPath: string;
   repositoryUrl?: string;
   languageStats?: LanguageStats[];
+  dependencyEdges?: DependencyEdge[];
 }
 
 export interface VulnerabilityWithPath extends Vulnerability {

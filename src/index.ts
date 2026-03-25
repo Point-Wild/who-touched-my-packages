@@ -8,8 +8,10 @@ import ora from 'ora';
 import { GitHubDataSource, OSVDataSource } from './auditor/datasources/index.js';
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
 import { parseDependencies } from './scanner/dependency-parser.js';
+import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency-tree-resolver.js';
 import { findDependencyFiles } from './scanner/file-finder.js';
 import { detectLanguages } from './scanner/language-detector.js';
+import type { Dependency, DependencyEdge } from './scanner/types.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -125,6 +127,52 @@ async function main() {
     spinner.succeed(`Parsed ${dependencies.length} package(s)`);
   }
   
+  // Build dependency trees for graph visualization
+  let allDependencies: Dependency[] = dependencies;
+  let dependencyEdges: DependencyEdge[] = [];
+  
+  if (options.html) {
+    if (!options.json) {
+      spinner = ora({
+        text: 'Building dependency trees...',
+        color: 'cyan',
+      }).start();
+    }
+    
+    const npmFiles = files.filter(f => f.type === 'package.json');
+    const allTreeNodes = new Map<string, Dependency>();
+    
+    for (const file of npmFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'npm');
+        const flatDeps = flattenDependencyTree(tree);
+        
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+        
+        dependencyEdges.push(...tree.edges);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+    
+    allDependencies = Array.from(allTreeNodes.values());
+    
+    if (spinner) {
+      spinner.succeed(`Built dependency trees (${allDependencies.length} total packages, ${dependencyEdges.length} edges)`);
+    }
+  }
+  
   if (dependencies.length === 0) {
     if (!options.json && !options.html) {
       clack.outro(theme.dim('No dependencies found.'));
@@ -169,7 +217,7 @@ async function main() {
       }).start();
     }
     
-    const server = await reporter.generateHtmlReport(result, dependencies, scanPath, options.repo, languageStats);
+    const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges);
     
     if (spinner) {
       spinner.succeed(`Report server started at ${server.url}`);
