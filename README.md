@@ -25,6 +25,10 @@ Or use directly with npx:
 
 ```bash
 npx who-touched-my-packages
+
+# e.g. 
+npx who-touched-my-packages --repo https://github.com/appsecco/dvna # Vulnerable Node app
+npx who-touched-my-packages --repo https://github.com/anxolerd/dvpwa # Vulnerable Python app
 ```
 
 ## 🚀 Usage
