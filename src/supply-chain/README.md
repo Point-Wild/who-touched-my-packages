@@ -97,10 +97,51 @@ The programmatic triage scans for these pattern families:
 
 ## Usage
 
+### Input
+
+The analyzer takes an array of `Dependency` objects (from the scanner) and options:
+
+```typescript
+interface Dependency {
+  name: string;           // e.g., "express", "@scope/package"
+  version: string;        // resolved version, e.g., "4.18.2"
+  versionSpec: string;    // version specifier from manifest, e.g., "^4.18.0"
+  ecosystem: 'npm' | 'pypi';
+  file: string;           // path to the manifest file that declared this dependency
+  isDev: boolean;         // true if from devDependencies / dev requirements
+}
+```
+
+These are produced by the scanner's `parseDependencies()` function, which reads `package.json` and `requirements.txt` files. You can also construct them manually:
+
 ```typescript
 import { analyzeSupplyChain } from './supply-chain';
 
-const result = await analyzeSupplyChain(dependencies, {
+// From the scanner pipeline (typical usage)
+const result = await analyzeSupplyChain(scanResult.dependencies, {
+  provider: 'openrouter',
+  model: 'anthropic/claude-sonnet-4',
+});
+
+// Or manually constructed
+const result = await analyzeSupplyChain([
+  {
+    name: 'express',
+    version: '4.21.2',
+    versionSpec: '^4.18.0',
+    ecosystem: 'npm',
+    file: 'package.json',
+    isDev: false,
+  },
+  {
+    name: 'some-suspicious-pkg',
+    version: '1.0.0',
+    versionSpec: '1.0.0',
+    ecosystem: 'npm',
+    file: 'package.json',
+    isDev: false,
+  },
+], {
   apiKey: 'sk-...',          // or set THREATPOINT_API_KEY env var
   model: 'claude-sonnet-4-5-20241022', // default
   provider: 'anthropic',     // 'anthropic' | 'openai' | 'openrouter'
@@ -108,8 +149,10 @@ const result = await analyzeSupplyChain(dependencies, {
 });
 
 console.log(result.summary);
-// { total: 5, critical: 1, high: 2, medium: 1, low: 1, byCategory: { ... } }
+// { totalFindings: 5, critical: 1, high: 2, medium: 1, low: 1, byCategory: { ... } }
 ```
+
+The analyzer will fetch each package's metadata and source from the registry (npm or PyPI), then run triage + LLM analysis on the downloaded source code.
 
 ### API Key Resolution
 
