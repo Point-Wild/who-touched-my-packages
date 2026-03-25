@@ -36,7 +36,6 @@ program
   .option('--no-html', 'Disable HTML report generation')
   .option('-v, --verbose', 'Verbose output', false)
   .option('--supply-chain', 'Enable supply chain security analysis', false)
-  .option('--supply-chain-api-key <key>', 'API key for LLM analysis (or set ANTHROPIC_API_KEY env var)')
   .option('--supply-chain-model <model>', 'LLM model to use for supply chain analysis', 'claude-sonnet-4-5-20241022')
   .option('--supply-chain-provider <provider>', 'LLM provider (anthropic, openrouter, openai)', 'anthropic')
   .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', '3')
