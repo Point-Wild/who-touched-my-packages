@@ -1,6 +1,6 @@
 # Supply Chain Analyzer
 
-AI-powered detection of supply chain poisoning threats in npm and PyPI packages. Uses a two-phase approach: programmatic triage scoring against 35+ threat indicator patterns, followed by per-file LLM analysis to confirm or dismiss each suspicious file.
+AI-powered detection of supply chain poisoning threats in npm and PyPI packages. Uses a two-phase approach: programmatic triage scoring against 79+ threat indicator patterns, followed by per-file LLM analysis to confirm or dismiss each suspicious file.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ The analyzer uses a two-phase investigation strategy:
 Phase 1 (Programmatic)                    Phase 2 (LLM per-file)
 ┌─────────────────────┐                   ┌──────────────────────────┐
 │ Triage all files     │                   │ For each suspicious file │
-│ against 35+ threat   │──► Top N files ──►│ • Read full content      │
+│ against 79+ threat   │──► Top N files ──►│ • Read full content      │
 │ indicator patterns   │    (score ≥ 8)    │ • LLM determines intent  │
 │ with compound scoring│                   │ • Report findings        │
 └─────────────────────┘                   └──────────────────────────┘
@@ -28,19 +28,19 @@ Dependency[] ──► fetch_metadata ──► primary_analysis ──► deep_
 
 ### Stage 1: Fetch Metadata (`nodes/fetch-metadata.ts`)
 
-Queries npm/PyPI registries in parallel, downloads package tarballs, and extracts text files (<500KB), install scripts, and entry points.
+Queries npm/PyPI registries in parallel, downloads package tarballs, and extracts all text files (<500KB). All extracted file contents are passed through to the triage scanner.
 
 ### Stage 2: Primary Analysis (`nodes/primary-analysis.ts`)
 
 Two-phase investigation per package:
 
 **Phase 1 — Programmatic Triage** (`tools.ts: runTriage()`)
-- Scores every file against 35+ threat indicator patterns
+- Scores every extracted file against 79+ threat indicator patterns
 - Applies compound scoring: files matching multiple threat categories (e.g., network + creds + exec) score exponentially higher
 - Applies path-based weighting:
   - Install scripts: 3x boost
   - Build configs, scripts, entry points: 1.5x boost
-  - Test files, docs, type definitions: 0.3x suppression
+  - Test files, docs, markdown, minified JS, source maps, examples: 0.3x suppression
 - Returns a ranked list of suspicious files above the score threshold
 
 **Phase 2 — Per-file LLM Analysis**
@@ -101,14 +101,14 @@ The programmatic triage scans for these pattern families:
 import { analyzeSupplyChain } from './supply-chain';
 
 const result = await analyzeSupplyChain(dependencies, {
-  apiKey: 'sk-...',          // or set THREATPOINT_API_KEY env var
+  apiKey: 'sk-...',          // or set provider-specific env var
   model: 'claude-sonnet-4-5-20241022', // default
   provider: 'anthropic',     // 'anthropic' | 'openai' | 'openrouter'
   concurrency: 3,            // parallel package analyses
 });
 
 console.log(result.summary);
-// { total: 5, critical: 1, high: 2, medium: 1, low: 1, byCategory: { ... } }
+// { packagesAnalyzed: 19, totalFindings: 5, critical: 1, high: 2, medium: 1, low: 1, byCategory: { ... } }
 ```
 
 ### API Key Resolution
@@ -116,8 +116,7 @@ console.log(result.summary);
 The API key is resolved in order:
 
 1. `options.apiKey` parameter
-2. `THREATPOINT_API_KEY` environment variable
-3. `~/.threatpoint` file (first line)
+2. Provider-specific environment variable: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`
 
 ### Progress Callback
 
@@ -134,18 +133,19 @@ Set `SC_VERBOSE=1` to see detailed triage scores, per-file analysis progress, an
 ## Output
 
 ```typescript
-interface SupplyChainResult {
+interface SupplyChainReport {
   findings: SupplyChainFinding[];
   summary: {
-    total: number;
+    packagesAnalyzed: number;
+    packagesWithFindings: number;
+    totalFindings: number;
     critical: number;
     high: number;
     medium: number;
     low: number;
     byCategory: Partial<Record<ThreatCategory, number>>;
   };
-  packagesAnalyzed: number;
-  timestamp: Date;
+  timestamp: string;
   model: string;
 }
 
@@ -183,7 +183,8 @@ supply-chain/
 │   └── aggregate.ts      # Stage 4: dedup, sort, summarize
 └── registry/
     ├── npm.ts            # NPM registry integration
-    └── pypi.ts           # PyPI registry integration
+    ├── pypi.ts           # PyPI registry integration
+    └── tarball.ts        # Tarball download, decompression & extraction
 ```
 
 ## LLM Providers
