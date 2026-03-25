@@ -6,7 +6,7 @@ import starlightThemeFlexoki from 'starlight-theme-flexoki';
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://who-touched-my-deps.dev',
+    site: 'https://Point-Wild.github.io/who-touched-my-packages',
     base: '/',
     integrations: [
         sitemap({
