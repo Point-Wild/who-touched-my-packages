@@ -44,6 +44,21 @@ program
 
 const options = program.opts();
 
+// Auto-disable HTML generation in CI environments
+const isCI = process.env.CI ||
+  process.env.GITHUB_ACTIONS ||
+  process.env.GITLAB_CI ||
+  process.env.CIRCLECI ||
+  process.env.TRAVIS ||
+  process.env.DRONE ||
+  process.env.BUILDKITE ||
+  process.env.JENKINS ||
+  process.env.TEAMCITY_VERSION;
+
+if (isCI) {
+  options.html = false;
+}
+
 async function main() {
   const logger = new Logger(options.verbose);
   
