@@ -9,7 +9,7 @@ import { pMap, depKey } from '../utils.js';
  */
 export async function fetchMetadataNode(
   dependencies: Dependency[],
-  concurrency: number = 10,
+  concurrency: number = 6,
   onProgress?: (done: number, total: number) => void
 ): Promise<{
   metadata: Map<string, PackageMetadata>;

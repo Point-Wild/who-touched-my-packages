@@ -1,7 +1,5 @@
-import { createGunzip } from 'node:zlib';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import type { PackageMetadata, PackageSource } from '../types.js';
+import { downloadAndExtractTarGz } from './tarball.js';
 
 const PYPI_BASE = 'https://pypi.org/pypi';
 const STATS_BASE = 'https://pypistats.org/api/packages';
@@ -90,7 +88,8 @@ export async function fetchPypiSource(
   const tarRes = await fetch(sdist.url);
   if (!tarRes.ok) return null;
 
-  const { fileList, fileContents } = await extractTarGz(tarRes);
+  const PYPI_TEXT_PATTERN = /\.(py|js|ts|sh|json|yml|yaml|toml|cfg|ini|txt|md|pth)$/i;
+  const { fileList, fileContents } = await downloadAndExtractTarGz(tarRes, PYPI_TEXT_PATTERN);
 
   // Find entry points
   const entryKey = Object.keys(fileContents).find(
@@ -131,57 +130,3 @@ export async function fetchPypiSource(
   };
 }
 
-interface TarExtractResult {
-  fileList: string[];
-  fileContents: Record<string, string>;
-}
-
-async function extractTarGz(response: Response): Promise<TarExtractResult> {
-  const fileList: string[] = [];
-  const fileContents: Record<string, string> = {};
-  const MAX_FILE_SIZE = 500_000;
-  const MAX_FILES_TO_READ = 100;
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-
-  const decompressed = await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const gunzip = createGunzip();
-    const input = Readable.from(buffer);
-
-    gunzip.on('data', (chunk: Buffer) => chunks.push(chunk));
-    gunzip.on('end', () => resolve(Buffer.concat(chunks)));
-    gunzip.on('error', reject);
-
-    pipeline(input, gunzip).catch(reject);
-  });
-
-  let offset = 0;
-  let filesRead = 0;
-
-  while (offset < decompressed.length - 512) {
-    const header = decompressed.subarray(offset, offset + 512);
-    if (header.every(b => b === 0)) break;
-
-    const name = header.subarray(0, 100).toString('utf-8').replace(/\0/g, '').trim();
-    const sizeOctal = header.subarray(124, 136).toString('utf-8').replace(/\0/g, '').trim();
-    const size = parseInt(sizeOctal, 8) || 0;
-    const typeFlag = header[156];
-
-    offset += 512;
-
-    if (name && typeFlag !== 53) {
-      fileList.push(name);
-
-      const isTextFile = /\.(py|js|ts|sh|json|yml|yaml|toml|cfg|ini|txt|md|pth)$/i.test(name);
-      if (isTextFile && size > 0 && size < MAX_FILE_SIZE && filesRead < MAX_FILES_TO_READ) {
-        fileContents[name] = decompressed.subarray(offset, offset + size).toString('utf-8');
-        filesRead++;
-      }
-    }
-
-    offset += Math.ceil(size / 512) * 512;
-  }
-
-  return { fileList, fileContents };
-}

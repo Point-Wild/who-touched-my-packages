@@ -1,7 +1,5 @@
-import { createGunzip } from 'node:zlib';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import type { PackageMetadata, PackageSource } from '../types.js';
+import { downloadAndExtractTarGz } from './tarball.js';
 
 const REGISTRY_BASE = 'https://registry.npmjs.org';
 const DOWNLOADS_BASE = 'https://api.npmjs.org/downloads/point/last-week';
@@ -75,7 +73,8 @@ export async function fetchNpmSource(
   const tarRes = await fetch(tarballUrl);
   if (!tarRes.ok) return null;
 
-  const { fileList, fileContents } = await extractTarGz(tarRes);
+  const NPM_TEXT_PATTERN = /\.(js|ts|mjs|cjs|py|sh|json|yml|yaml|toml|cfg|ini|txt|md)$/i;
+  const { fileList, fileContents } = await downloadAndExtractTarGz(tarRes, NPM_TEXT_PATTERN);
 
   // Find entry point
   const entryKey = Object.keys(fileContents).find(
@@ -123,67 +122,3 @@ export async function fetchNpmSource(
   };
 }
 
-interface TarExtractResult {
-  fileList: string[];
-  fileContents: Record<string, string>;
-}
-
-/**
- * Extract a .tar.gz buffer in memory using minimal tar parsing.
- * Only extracts text files under 500KB to avoid memory issues.
- */
-async function extractTarGz(response: Response): Promise<TarExtractResult> {
-  const fileList: string[] = [];
-  const fileContents: Record<string, string> = {};
-  const MAX_FILE_SIZE = 500_000;
-  const MAX_FILES_TO_READ = 100;
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-
-  // Decompress gzip
-  const decompressed = await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const gunzip = createGunzip();
-    const input = Readable.from(buffer);
-
-    gunzip.on('data', (chunk: Buffer) => chunks.push(chunk));
-    gunzip.on('end', () => resolve(Buffer.concat(chunks)));
-    gunzip.on('error', reject);
-
-    pipeline(input, gunzip).catch(reject);
-  });
-
-  // Parse tar (512-byte block format)
-  let offset = 0;
-  let filesRead = 0;
-
-  while (offset < decompressed.length - 512) {
-    const header = decompressed.subarray(offset, offset + 512);
-
-    // Check for end-of-archive (two zero blocks)
-    if (header.every(b => b === 0)) break;
-
-    const name = header.subarray(0, 100).toString('utf-8').replace(/\0/g, '').trim();
-    const sizeOctal = header.subarray(124, 136).toString('utf-8').replace(/\0/g, '').trim();
-    const size = parseInt(sizeOctal, 8) || 0;
-    const typeFlag = header[156];
-
-    offset += 512; // Move past header
-
-    if (name && typeFlag !== 53) { // 53 = '5' (directory)
-      fileList.push(name);
-
-      // Read content for text-like files
-      const isTextFile = /\.(js|ts|mjs|cjs|py|sh|json|yml|yaml|toml|cfg|ini|txt|md)$/i.test(name);
-      if (isTextFile && size > 0 && size < MAX_FILE_SIZE && filesRead < MAX_FILES_TO_READ) {
-        fileContents[name] = decompressed.subarray(offset, offset + size).toString('utf-8');
-        filesRead++;
-      }
-    }
-
-    // Advance past file data (padded to 512-byte boundary)
-    offset += Math.ceil(size / 512) * 512;
-  }
-
-  return { fileList, fileContents };
-}
