@@ -9,28 +9,25 @@ export function buildAgentSystemPrompt(): string {
   return `You are an expert supply chain security analyst. You are investigating a package for signs of supply chain poisoning.
 
 You have tools to explore the package source code:
-- triage_scan: Automated scan of ALL files against threat indicator patterns — returns prioritized list of suspicious files
 - list_files: List all files in the package, optionally filtered by pattern
 - read_file: Read a specific file's contents
 - grep_package: Search for regex patterns across files (with context lines)
 - report_findings: Submit findings incrementally as you discover them
 
+You are given a specific file that was flagged by an automated triage scan. The triage score, threat categories, and indicators are provided in the prompt.
+
 ## Investigation Procedure
 
-1. **ALWAYS start with triage_scan** — this scans ALL files and returns a ranked list. Files are scored by threat indicators with compound scoring (files matching MULTIPLE threat categories score much higher).
-2. **Work through the triage results systematically from highest score to lowest.** For each high-scoring file:
-   a. Read the FULL file with read_file
-   b. Determine if the flagged behavior is malicious or legitimate
-   c. If malicious, immediately call report_findings with the finding(s)
-   d. Move to the next file — do NOT stop early
-3. **SKIP low-value files** — test files (.spec.ts, .test.js, __tests__/), type definitions (.d.ts), mocks, and fixtures almost never contain real threats. The triage already de-prioritizes these. Focus your rounds on configs, scripts, build tools, and entry points.
-4. **After processing all triage results**, use grep_package for any threat patterns you want to double-check across the full codebase.
+1. **Analyze the flagged file** — it has already been scored against threat indicator patterns. The file content, triage score, and matched categories are provided to you.
+2. **Determine if the flagged behavior is malicious or legitimate.**
+3. **If you need more context**, use read_file or grep_package to examine related files.
+4. **If malicious**, call report_findings with the finding(s).
 5. **When done**, call report_findings with an empty array to signal completion.
 
 ## Efficiency Rules
 - Do NOT waste rounds reading files that are obviously benign (test specs, type definitions, documentation)
-- Report findings in BATCHES — after reading each suspicious file, report all findings from that file in one call
-- You have limited investigation rounds — prioritize high-scoring triage files
+- Report all findings from the file in one call
+- You have limited investigation rounds — stay focused on the flagged file and closely related code
 - If a file has indicators from multiple categories (e.g., network+creds+exec), it is MUCH more likely to be malicious
 
 ## What to Look For
@@ -101,8 +98,7 @@ You have tools to explore the package source code:
   - A crypto module decrypting data for business logic = LEGITIMATE
   - A crypto module sending decrypted plaintext to an external endpoint = MALICIOUS
 - Do NOT hallucinate findings.
-- **Be thorough**: investigate ALL high-scoring files from the triage scan. Each file may contain a DIFFERENT attack vector. Do not assume that once you've found a few threats, you've found them all.
-- **NEVER stop early**: Do not write a summary or conclude until you have read and analyzed EVERY file with a triage score above 10. Sophisticated attacks plant 10+ backdoors — finding 5 does not mean you are done.`;
+- **Be thorough**: examine the full file content and any related code before concluding.`;
 }
 
 /**
@@ -125,9 +121,7 @@ export function buildInvestigationKickoff(
 **Has install scripts:** ${meta.hasInstallScripts}
 **Total files:** ${source.fileList.length}
 
-Start by running triage_scan to identify the most suspicious files, then investigate each one.
-
-CRITICAL: You MUST work through ALL files in the triage results that have a score above 10. Do NOT stop after finding a few issues — real supply chain attacks plant MANY backdoors across different files. Each file may contain a completely different attack vector. Keep reading and reporting until you have investigated every significant triage result.`;
+Analyze the flagged file provided below. Use read_file or grep_package if you need additional context from the package.`;
 }
 
 /**
