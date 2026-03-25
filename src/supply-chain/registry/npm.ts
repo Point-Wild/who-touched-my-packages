@@ -7,7 +7,7 @@ const REGISTRY_BASE = 'https://registry.npmjs.org';
 const DOWNLOADS_BASE = 'https://api.npmjs.org/downloads/point/last-week';
 
 export async function fetchNpmMetadata(packageName: string): Promise<PackageMetadata | null> {
-  const encoded = packageName.replace('/', '%2f');
+  const encoded = encodeURIComponent(packageName);
 
   const [metaRes, dlRes] = await Promise.all([
     fetch(`${REGISTRY_BASE}/${encoded}`),
