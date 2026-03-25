@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReportData } from '../types';
 import { GraphView } from './graph/GraphView';
 
@@ -29,6 +29,22 @@ export function GraphTab({ data }: GraphTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<string>('all');
   const [fitViewSignal, setFitViewSignal] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   const vulnerablePackages = useMemo(() => {
     return new Set(data.auditResult.vulnerabilities.map(v => v.packageName));
@@ -144,7 +160,20 @@ export function GraphTab({ data }: GraphTabProps) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '600px', gap: '1rem' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: isFullscreen ? '100vh' : '600px',
+      gap: '1rem',
+      position: isFullscreen ? 'fixed' : 'relative',
+      top: isFullscreen ? '0' : 'auto',
+      left: isFullscreen ? '0' : 'auto',
+      right: isFullscreen ? '0' : 'auto',
+      bottom: isFullscreen ? '0' : 'auto',
+      zIndex: isFullscreen ? 9999 : 'auto',
+      background: isFullscreen ? 'var(--bg-primary)' : 'transparent',
+      padding: isFullscreen ? '1rem' : '0',
+    }}>
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
         <label style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 600 }}>
           Filter by file:
@@ -194,7 +223,30 @@ export function GraphTab({ data }: GraphTabProps) {
           justifyContent: 'center',
           background: 'var(--bg-secondary)',
           borderRadius: '12px',
+          position: 'relative',
         }}>
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 10,
+              padding: '8px 12px',
+              background: 'var(--bg-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            {isFullscreen ? '⛶ Exit' : '⛶ Fullscreen'}
+          </button>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '18px', marginBottom: '8px' }}>⚙️ Computing layout...</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
@@ -208,7 +260,30 @@ export function GraphTab({ data }: GraphTabProps) {
           background: 'var(--bg-secondary)',
           borderRadius: '12px',
           overflow: 'hidden',
+          position: 'relative',
         }}>
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Enter fullscreen"}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 10,
+              padding: '8px 12px',
+              background: 'var(--bg-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            {isFullscreen ? '⛶ Exit' : '⛶ Fullscreen'}
+          </button>
           <GraphView
             nodes={layoutedGraph.nodes}
             edges={layoutedGraph.edges}
