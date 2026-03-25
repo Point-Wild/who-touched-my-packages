@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ReportData } from '../types';
+import { ExportButton } from './ExportButton';
 
 interface VulnerabilitiesTabProps {
   data: ReportData;
@@ -30,6 +31,17 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
       return matchesSearch && matchesSeverity;
     });
   }, [vulnerabilitiesWithPaths, searchTerm, severityFilter]);
+
+  const csvHeaders = [
+    { key: 'severity' as const, label: 'Severity' },
+    { key: 'id' as const, label: 'ID' },
+    { key: 'packageName' as const, label: 'Package' },
+    { key: 'packageVersion' as const, label: 'Version' },
+    { key: 'title' as const, label: 'Title' },
+    { key: 'cvss' as const, label: 'CVSS' },
+    { key: 'filePaths' as const, label: 'File Paths' },
+    { key: 'references' as const, label: 'References' },
+  ];
 
   if (data.auditResult.vulnerabilities.length === 0) {
     return (
@@ -80,6 +92,11 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
           <option value="LOW">Low</option>
           <option value="UNKNOWN">Unknown</option>
         </select>
+        <ExportButton
+          data={filteredVulns}
+          filename="vulnerabilities"
+          csvHeaders={csvHeaders}
+        />
       </div>
 
       <div className="table-container">

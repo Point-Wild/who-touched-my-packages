@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ReportData } from '../types';
+import { ExportButton } from './ExportButton';
 
 interface DependenciesTabProps {
   data: ReportData;
@@ -60,6 +61,24 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
     });
   }, [data.dependencies, searchTerm, showVulnerableOnly, vulnerablePackages, vulnerabilitySeverityMap]);
 
+  const depsForExport = useMemo(() => {
+    return filteredDeps.map(dep => ({
+      ...dep,
+      isVulnerable: vulnerablePackages.has(dep.name),
+      maxSeverity: vulnerabilitySeverityMap.get(dep.name) || 'N/A',
+    }));
+  }, [filteredDeps, vulnerablePackages, vulnerabilitySeverityMap]);
+
+  const csvHeaders = [
+    { key: 'name' as const, label: 'Package Name' },
+    { key: 'version' as const, label: 'Version' },
+    { key: 'ecosystem' as const, label: 'Ecosystem' },
+    { key: 'file' as const, label: 'File Path' },
+    { key: 'isDev' as const, label: 'Type' },
+    { key: 'isVulnerable' as const, label: 'Vulnerable' },
+    { key: 'maxSeverity' as const, label: 'Max Severity' },
+  ];
+
   if (data.dependencies.length === 0) {
     return (
       <div className="empty-state">
@@ -103,6 +122,11 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
           />
           Vulnerable only
         </label>
+        <ExportButton
+          data={depsForExport}
+          filename="dependencies"
+          csvHeaders={csvHeaders}
+        />
       </div>
 
       <div className="table-container">
