@@ -1,0 +1,69 @@
+header.header {
+    background-color: unset !important;
+}
+
+.sl-link-button {
+    background-color: #4A7FFFff;
+    border-radius: 8px;
+    padding: 4px 8px;
+}
+.sl-link-button.primary {
+    border-radius: 8px !important;
+}
+.sl-link-button.primary:hover::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    /* margin: -1px; */
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: linear-gradient(-10deg, #4A7FFFff, #6B99FFff);
+}
+
+.main-frame {
+    overflow-y: auto;
+    margin-top: calc(var(--sl-nav-height) + var(--sl-mobile-toc-height));
+    height: calc(100vh - var(--sl-nav-height) - var(--sl-mobile-toc-height));
+    padding-top: 0 !important;
+}
+.hero {
+    padding-block: unset !important;
+}
+.card {
+    background-color: #00000033;
+    position: relative;
+    border-radius: 8px;
+
+    border-width: 1px;
+    border-style: solid;
+    border-color: transparent;
+    box-sizing: border-box;
+    background-clip: padding-box;
+    /* padding: 16px; */
+    background-image: 'unset',
+}
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+    margin: -1px;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(-10deg, #34405147, #E4E7EC47);
+    mask: conic-gradient(#000 0 0) content-box exclude, conic-gradient(#000 0 0)
+}
+
+
+:root {
+  --sl-color-accent-high: #ff0000; /* Bright red for high contrast elements */
+  --sl-color-accent: #e60000;      /* Default red accent color */
+  --sl-color-accent-low: #ffe5e5;  /* Light red for low contrast backgrounds */
+}
