@@ -18,9 +18,13 @@ export async function generateAndServeReport(data: ReportData): Promise<{ url: s
   // Write the data file
   writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf-8');
 
-  // Get the client dist path - when installed, client/dist is at package root
-  // __dirname will be <package-root>/dist when built, so go up one level
-  const clientDistPath = join(__dirname, '../client/dist');
+  // Get the client dist path
+  // In dev: __dirname is <package-root>/src/ui/html-report
+  // In prod: __dirname is <package-root>/dist
+  // client/dist is always at <package-root>/client/dist
+  const clientDistPath = __dirname.includes('/dist')
+    ? join(__dirname, '..', 'client', 'dist')  // Production: dist/ -> ../client/dist
+    : join(__dirname, '../../..', 'client', 'dist');  // Dev: src/ui/html-report/ -> ../../../client/dist
 
   // Collect all file paths that should be accessible
   const filePaths = new Set<string>();
