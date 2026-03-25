@@ -1,7 +1,6 @@
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
 import type { Dependency, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatSummary, formatVulnerability } from './formatters.js';
-import { generateHtmlReport } from './html-report/generator.js';
 import type { ReportData } from './html-report/types.js';
 import { theme } from './theme.js';
 
@@ -141,7 +140,7 @@ export class Reporter {
     });
   }
   
-  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string): Promise<string> {
+  async generateHtmlReport(result: AuditResult, dependencies: Dependency[], scanPath: string, repositoryUrl?: string): Promise<{ url: string; close: () => void }> {
     const reportData: ReportData = {
       auditResult: result,
       dependencies,
@@ -149,6 +148,7 @@ export class Reporter {
       repositoryUrl,
     };
     
-    return await generateHtmlReport(reportData);
+    const { generateAndServeReport } = await import('./html-report/new-generator.js');
+    return await generateAndServeReport(reportData);
   }
 }

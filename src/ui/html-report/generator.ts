@@ -19,6 +19,7 @@ export async function generateHtmlReport(data: ReportData): Promise<string> {
   <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+  <script src="https://unpkg.com/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <style>
     :root {
       --bg-primary: #0a0a0f;
@@ -340,6 +341,97 @@ export async function generateHtmlReport(data: ReportData): Promise<string> {
       text-align: right;
       font-weight: 600;
     }
+    
+    .warning-card {
+      background: rgba(245, 158, 11, 0.1);
+      border: 2px solid var(--accent-amber);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .warning-card:hover {
+      background: rgba(245, 158, 11, 0.15);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    }
+    
+    .warning-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .warning-icon {
+      font-size: 2rem;
+    }
+    
+    .warning-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent-amber);
+    }
+    
+    .warning-description {
+      color: var(--text-secondary);
+      margin-left: 3rem;
+    }
+    
+    .editor-container {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    
+    .editor-header {
+      background: var(--bg-tertiary);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .editor-title {
+      font-weight: 600;
+      font-family: monospace;
+      color: var(--text-primary);
+    }
+    
+    .editor-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--accent-amber);
+      color: white;
+    }
+    
+    .monaco-editor-wrapper {
+      height: 600px;
+      width: 100%;
+    }
+    
+    .non-pinned-line {
+      background: rgba(245, 158, 11, 0.15) !important;
+    }
+    
+    .non-pinned-glyph {
+      background: var(--accent-amber);
+      width: 3px !important;
+      margin-left: 3px;
+    }
+    
+    .non-pinned-decoration {
+      background: var(--accent-amber);
+      width: 5px !important;
+    }
   </style>
 </head>
 <body>
@@ -403,12 +495,18 @@ export async function generateHtmlReport(data: ReportData): Promise<string> {
               className={\`tab \${activeTab === 'dependencies' ? 'active' : ''}\`}
               onClick={() => setActiveTab('dependencies')}
             >
-              � Dependencies
+              📦 Dependencies
+            </button>
+            <button 
+              className={\`tab \${activeTab === 'pinning' ? 'active' : ''}\`}
+              onClick={() => setActiveTab('pinning')}
+            >
+              📌 Pinning Issues
             </button>
           </div>
           
           <div className={\`tab-content \${activeTab === 'overview' ? 'active' : ''}\`}>
-            <OverviewTab data={REPORT_DATA} />
+            <OverviewTab data={REPORT_DATA} onNavigateToPinning={() => setActiveTab('pinning')} />
           </div>
           
           <div className={\`tab-content \${activeTab === 'vulnerabilities' ? 'active' : ''}\`}>
@@ -418,12 +516,31 @@ export async function generateHtmlReport(data: ReportData): Promise<string> {
           <div className={\`tab-content \${activeTab === 'dependencies' ? 'active' : ''}\`}>
             <GraphTab data={REPORT_DATA} />
           </div>
+          
+          <div className={\`tab-content \${activeTab === 'pinning' ? 'active' : ''}\`}>
+            <PinningTab data={REPORT_DATA} />
+          </div>
         </div>
       );
     }
     
-    function OverviewTab({ data }) {
+    function OverviewTab({ data, onNavigateToPinning }) {
       const { summary } = data.auditResult;
+      
+      const nonPinnedDeps = useMemo(() => {
+        return data.dependencies.filter(dep => {
+          const spec = dep.versionSpec;
+          // For npm: check if it starts with ^ or ~ or contains wildcards
+          if (dep.ecosystem === 'npm') {
+            return spec.startsWith('^') || spec.startsWith('~') || spec.includes('*') || spec.includes('x') || spec.includes('X') || spec === 'latest';
+          }
+          // For pypi: check if it doesn't have == or uses >= or other non-pinned operators
+          if (dep.ecosystem === 'pypi') {
+            return !spec.startsWith('==') || spec.includes('>=') || spec.includes('>') || spec.includes('~=') || spec === '*';
+          }
+          return false;
+        });
+      }, [data.dependencies]);
       
       const pieData = [
         { name: 'Critical', value: summary.critical, color: 'var(--critical)' },
@@ -469,6 +586,19 @@ export async function generateHtmlReport(data: ReportData): Promise<string> {
               <div className="value">{data.auditResult.scannedPackages}</div>
             </div>
           </div>
+          
+          {nonPinnedDeps.length > 0 && (
+            <div className="warning-card" onClick={onNavigateToPinning}>
+              <div className="warning-header">
+                <div className="warning-icon">⚠️</div>
+                <div className="warning-title">Non-Pinned Dependencies Detected</div>
+              </div>
+              <div className="warning-description">
+                Found {nonPinnedDeps.length} {nonPinnedDeps.length === 1 ? 'dependency' : 'dependencies'} with non-pinned versions. 
+                Click here to view and fix pinning issues in your dependency files.
+              </div>
+            </div>
+          )}
           
           {summary.total > 0 ? (
             <div className="chart-container" style={{ marginBottom: '2rem' }}>
@@ -900,6 +1030,229 @@ export async function generateHtmlReport(data: ReportData): Promise<string> {
           
           <div style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
             Showing {filteredDeps.length} of {data.dependencies.length} dependencies
+          </div>
+        </>
+      );
+    }
+    
+    function PinningTab({ data }) {
+      const [selectedFile, setSelectedFile] = useState(null);
+      const editorRef = useCallback(node => {
+        if (node && selectedFile) {
+          require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.45.0/min/vs' } });
+          require(['vs/editor/editor.main'], function() {
+            if (window.monacoEditor) {
+              window.monacoEditor.dispose();
+            }
+            
+            const editor = monaco.editor.create(node, {
+              value: selectedFile.content,
+              language: selectedFile.language,
+              theme: 'vs-dark',
+              readOnly: true,
+              automaticLayout: true,
+              minimap: { enabled: true },
+              scrollBeyondLastLine: false,
+              fontSize: 14,
+              lineNumbers: 'on',
+              renderWhitespace: 'selection',
+            });
+            
+            window.monacoEditor = editor;
+            
+            // Highlight non-pinned dependencies
+            const decorations = selectedFile.nonPinnedLines.map(lineNum => ({
+              range: new monaco.Range(lineNum, 1, lineNum, 1000),
+              options: {
+                isWholeLine: true,
+                className: 'non-pinned-line',
+                glyphMarginClassName: 'non-pinned-glyph',
+                linesDecorationsClassName: 'non-pinned-decoration',
+                inlineClassName: 'non-pinned-inline',
+                overviewRuler: {
+                  color: 'rgba(245, 158, 11, 0.8)',
+                  position: monaco.editor.OverviewRulerLane.Full
+                },
+                minimap: {
+                  color: 'rgba(245, 158, 11, 0.8)',
+                  position: monaco.editor.MinimapPosition.Inline
+                }
+              }
+            }));
+            
+            editor.deltaDecorations([], decorations);
+          });
+        }
+        
+        return () => {
+          if (window.monacoEditor) {
+            window.monacoEditor.dispose();
+            window.monacoEditor = null;
+          }
+        };
+      }, [selectedFile]);
+      
+      const fileGroups = useMemo(() => {
+        const groups = new Map();
+        
+        data.dependencies.forEach(dep => {
+          const spec = dep.versionSpec;
+          let isNonPinned = false;
+          
+          if (dep.ecosystem === 'npm') {
+            isNonPinned = spec.startsWith('^') || spec.startsWith('~') || spec.includes('*') || spec.includes('x') || spec.includes('X') || spec === 'latest';
+          } else if (dep.ecosystem === 'pypi') {
+            isNonPinned = !spec.startsWith('==') || spec.includes('>=') || spec.includes('>') || spec.includes('~=') || spec === '*';
+          }
+          
+          if (isNonPinned) {
+            if (!groups.has(dep.file)) {
+              groups.set(dep.file, []);
+            }
+            groups.get(dep.file).push(dep);
+          }
+        });
+        
+        return groups;
+      }, [data.dependencies]);
+      
+      useEffect(() => {
+        if (fileGroups.size > 0 && !selectedFile) {
+          const firstFile = Array.from(fileGroups.keys())[0];
+          loadFile(firstFile);
+        }
+      }, [fileGroups]);
+      
+      const loadFile = async (filePath) => {
+        try {
+          const response = await fetch(\\\`vscode-file://vscode-app\\\${filePath}\\\`);
+          let content = '';
+          
+          if (!response.ok) {
+            content = \\\`# Unable to load file: \\\${filePath}\\\\n# File may not be accessible from the browser\\\\n\\\\n\\\`;
+            content += '# Non-pinned dependencies in this file:\\\\n';
+            const deps = fileGroups.get(filePath) || [];
+            deps.forEach(dep => {
+              content += \\\`# - \\\${dep.name}: \\\${dep.versionSpec}\\\\n\\\`;
+            });
+          } else {
+            content = await response.text();
+          }
+          
+          const language = filePath.endsWith('.json') ? 'json' : 'plaintext';
+          const deps = fileGroups.get(filePath) || [];
+          const nonPinnedLines = [];
+          
+          // Find line numbers for non-pinned dependencies
+          const lines = content.split('\\\\n');
+          deps.forEach(dep => {
+            lines.forEach((line, idx) => {
+              if (line.includes(dep.name) && line.includes(dep.versionSpec)) {
+                nonPinnedLines.push(idx + 1);
+              }
+            });
+          });
+          
+          setSelectedFile({
+            path: filePath,
+            content,
+            language,
+            nonPinnedLines,
+            nonPinnedCount: deps.length
+          });
+        } catch (error) {
+          const deps = fileGroups.get(filePath) || [];
+          let content = \\\`# Unable to load file: \\\${filePath}\\\\n# Error: \\\${error.message}\\\\n\\\\n\\\`;
+          content += '# Non-pinned dependencies in this file:\\\\n';
+          deps.forEach(dep => {
+            content += \\\`# - \\\${dep.name}: \\\${dep.versionSpec}\\\\n\\\`;
+          });
+          
+          setSelectedFile({
+            path: filePath,
+            content,
+            language: 'plaintext',
+            nonPinnedLines: [],
+            nonPinnedCount: deps.length
+          });
+        }
+      };
+      
+      if (fileGroups.size === 0) {
+        return (
+          <div className="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2>All Dependencies Pinned!</h2>
+            <p>All your dependencies are using pinned versions. Great job!</p>
+          </div>
+        );
+      }
+      
+      return (
+        <>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Select a file to view pinning issues:</h3>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {Array.from(fileGroups.entries()).map(([filePath, deps]) => (
+                <button
+                  key={filePath}
+                  onClick={() => loadFile(filePath)}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: selectedFile?.path === filePath ? 'var(--accent-amber)' : 'var(--bg-secondary)',
+                    border: \`1px solid \${selectedFile?.path === filePath ? 'var(--accent-amber)' : 'var(--border)'}\`,
+                    borderRadius: '8px',
+                    color: selectedFile?.path === filePath ? 'white' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontFamily: 'monospace',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedFile?.path !== filePath) {
+                      e.target.style.borderColor = 'var(--accent-amber)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedFile?.path !== filePath) {
+                      e.target.style.borderColor = 'var(--border)';
+                    }
+                  }}
+                >
+                  {filePath.split('/').pop()} ({deps.length})
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {selectedFile && (
+            <div className="editor-container">
+              <div className="editor-header">
+                <div className="editor-title">{selectedFile.path}</div>
+                <div className="editor-badge">
+                  {selectedFile.nonPinnedCount} non-pinned {selectedFile.nonPinnedCount === 1 ? 'dependency' : 'dependencies'}
+                </div>
+              </div>
+              <div className="monaco-editor-wrapper" ref={editorRef}></div>
+            </div>
+          )}
+          
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            padding: '1.5rem', 
+            borderRadius: '12px',
+            border: '1px solid var(--border)',
+            marginTop: '1.5rem'
+          }}>
+            <h3 style={{ marginBottom: '1rem' }}>💡 Best Practices for Pinning Dependencies</h3>
+            <ul style={{ color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
+              <li><strong>npm/package.json:</strong> Use exact versions (e.g., <code>"1.2.3"</code>) instead of ranges (<code>"^1.2.3"</code> or <code>"~1.2.3"</code>)</li>
+              <li><strong>Python/requirements.txt:</strong> Use <code>==</code> for exact versions (e.g., <code>package==1.2.3</code>) instead of <code>&gt;=</code> or <code>~=</code></li>
+              <li><strong>Why pin?</strong> Pinned versions ensure reproducible builds and prevent unexpected breaking changes</li>
+              <li><strong>Lock files:</strong> Use package-lock.json or poetry.lock for additional version locking</li>
+            </ul>
           </div>
         </>
       );

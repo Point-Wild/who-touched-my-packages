@@ -153,26 +153,43 @@ async function main() {
   if (options.html) {
     if (!options.json) {
       spinner = ora({
-        text: 'Generating HTML report...',
+        text: 'Starting report server...',
         color: 'cyan',
       }).start();
     }
     
-    const reportPath = await reporter.generateHtmlReport(result, dependencies, scanPath, options.repo);
+    const server = await reporter.generateHtmlReport(result, dependencies, scanPath, options.repo);
     
     if (spinner) {
-      spinner.succeed(`HTML report generated: ${reportPath}`);
+      spinner.succeed(`Report server started at ${server.url}`);
     }
     
     if (!options.json) {
       console.log(theme.info(`\n📄 Opening report in browser...\n`));
     }
     
-    await open(reportPath);
+    await open(server.url);
     
     if (!options.json) {
-      clack.outro(theme.success(`${icons.success} Report opened in browser!`));
+      console.log(theme.success(`${icons.success} Report opened in browser!`));
+      console.log(theme.dim(`\nServer running at ${server.url}`));
+      console.log(theme.dim('Press Ctrl+C to stop the server\n'));
     }
+    
+    // Keep the process running
+    process.on('SIGINT', async () => {
+      if (!options.json) {
+        console.log(theme.dim('\n\nShutting down server...'));
+      }
+      server.close();
+      if (cleanup) {
+        await cleanup();
+      }
+      process.exit(0);
+    });
+    
+    // Don't exit - keep server running
+    return;
   } else {
     reporter.reportResults(result);
     
