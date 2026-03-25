@@ -39,7 +39,6 @@ program
   .option('--supply-chain-model <model>', 'LLM model to use for supply chain analysis', 'claude-sonnet-4-5-20241022')
   .option('--supply-chain-provider <provider>', 'LLM provider (anthropic, openrouter, openai)', 'anthropic')
   .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', '3')
-  .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
   .parse();
 
 const options = program.opts();
@@ -216,7 +215,6 @@ async function main() {
         model: options.supplyChainModel,
         provider: options.supplyChainProvider,
         concurrency: parseInt(options.supplyChainConcurrency, 10),
-        dryRun: options.supplyChainDryRun,
       }, (stage, done, total) => {
         if (spinner) {
           spinner.text = `Supply chain analysis: ${stage} (${done}/${total})...`;

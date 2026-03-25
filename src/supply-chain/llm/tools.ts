@@ -141,16 +141,14 @@ const HIGH_VALUE_PATH_PATTERNS = [
 export function buildContentMap(source: PackageSource): Map<string, string> {
   const allContent = new Map<string, string>();
 
-  for (const [hook, content] of Object.entries(source.installScripts)) {
-    allContent.set(`package.json:${hook}`, content);
-  }
-
-  for (const [path, content] of Object.entries(source.suspiciousFiles)) {
+  // Include all extracted file contents for triage scanning
+  for (const [path, content] of Object.entries(source.fileContents)) {
     allContent.set(path, content);
   }
 
-  if (source.entryPoint) {
-    allContent.set('[entry-point]', source.entryPoint);
+  // Add install script hooks with a distinguishing prefix
+  for (const [hook, content] of Object.entries(source.installScripts)) {
+    allContent.set(`package.json:${hook}`, content);
   }
 
   return allContent;
