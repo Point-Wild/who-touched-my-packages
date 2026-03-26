@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 const REGISTRY_CACHE = new Map<string, any>();
+const PYPI_REGISTRY_CACHE = new Map<string, any>();
 
 async function fetchPackageFromRegistry(name: string, versionSpec: string): Promise<any | null> {
   const cacheKey = `${name}@${versionSpec}`;
@@ -37,6 +38,47 @@ async function fetchPackageFromRegistry(name: string, versionSpec: string): Prom
 
     const data = await response.json();
     REGISTRY_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function fetchPypiPackageFromRegistry(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (PYPI_REGISTRY_CACHE.has(cacheKey)) {
+    return PYPI_REGISTRY_CACHE.get(cacheKey);
+  }
+
+  try {
+    // Normalize version spec to get a concrete version
+    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    const url = normalizedVersion === 'latest'
+      ? `https://pypi.org/pypi/${name}/json`
+      : `https://pypi.org/pypi/${name}/${normalizedVersion}/json`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      // Try with latest if specific version fails
+      if (normalizedVersion !== 'latest') {
+        const latestUrl = `https://pypi.org/pypi/${name}/json`;
+        const latestResponse = await fetch(latestUrl, {
+          headers: { 'Accept': 'application/json' },
+        });
+        if (latestResponse.ok) {
+          const data = await latestResponse.json();
+          PYPI_REGISTRY_CACHE.set(cacheKey, data);
+          return data;
+        }
+      }
+      return null;
+    }
+
+    const data = await response.json();
+    PYPI_REGISTRY_CACHE.set(cacheKey, data);
     return data;
   } catch (error) {
     return null;
@@ -160,6 +202,76 @@ async function resolveNpmDependency(
   return node;
 }
 
+async function resolvePypiDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  // Fetch from PyPI registry
+  const pkg = await fetchPypiPackageFromRegistry(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+  
+  if (pkg?.info?.version) {
+    resolvedVersion = pkg.info.version;
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'pypi',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  // Recursively resolve dependencies if we have package data
+  // PyPI info may have requires_dist array with dependency specs
+  if (pkg?.info?.requires_dist && depth < MAX_DEPTH - 1) {
+    for (const req of pkg.info.requires_dist) {
+      // Parse requirement format like "package-name (>=1.0.0)" or "package-name>=1.0.0"
+      const match = req.match(/^([a-zA-Z0-9_.-]+)(?:\s*\(([>=<~!^0-9.]+)\)|([>=<~!^0-9.]+))?/);
+      if (match) {
+        const depName = match[1];
+        const depVersion = match[2] || match[3] || '*';
+        
+        // Skip optional/extra dependencies marked with ;
+        if (req.includes(';')) continue;
+        
+        const childNode = await resolvePypiDependency(
+          depName,
+          depVersion,
+          parentFile,
+          false,
+          depth + 1,
+          visited,
+          [...currentPath, name]
+        );
+        if (childNode) {
+          node.dependencies.push(childNode);
+        }
+      }
+    }
+  }
+  
+  return node;
+}
+
 export async function buildDependencyTree(
   rootFile: string,
   ecosystem: 'npm' | 'pypi'
@@ -208,6 +320,49 @@ export async function buildDependencyTree(
           if (node) {
             tree.roots.push(node);
             collectNodesAndEdges(node, tree, null, 'dev');
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
+  
+  if (ecosystem === 'pypi') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const lines = content.split('\n');
+      const visited = new Set<string>();
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        
+        // Skip empty lines, comments, and option lines
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('-')) {
+          continue;
+        }
+        
+        // Parse package specification: package==1.0.0, package>=1.0.0, package~=1.0.0, package
+        const match = trimmed.match(/^([a-zA-Z0-9_.-]+)([>=<~!]+)?(.+)?/);
+        
+        if (match) {
+          const name = match[1];
+          const operator = match[2] || '';
+          const version = match[3] || '*';
+          const versionSpec = operator + version;
+          
+          const node = await resolvePypiDependency(
+            name,
+            versionSpec,
+            rootFile,
+            false,
+            0,
+            visited,
+            []
+          );
+          if (node) {
+            tree.roots.push(node);
+            collectNodesAndEdges(node, tree, null, 'dependency');
           }
         }
       }
