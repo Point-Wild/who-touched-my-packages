@@ -103,8 +103,8 @@ wtmp --exclude test fixtures examples
 | `--git-clone-depth <number>` | | Git clone depth for shallow clones (`0` = full clone) | `0` |
 | `--max-depth <number>` | | Maximum directory recursion depth (`0` = unlimited) | `0` |
 | `--supply-chain` | | Enable supply chain security analysis | `false` |
-| `--supply-chain-model <model>` | | LLM model to use for supply chain analysis | `claude-sonnet-4-5-20241022` |
-| `--supply-chain-provider <provider>` | | LLM provider (anthropic, openrouter, openai) | `anthropic` |
+| `--supply-chain-model <model>` | | LLM model for supply chain analysis (see [Providers](#supply-chain-llm-providers)) | `claude-sonnet-4-5-20250514` |
+| `--llm-provider <provider>` | | LLM provider — auto-detected from model name when omitted | Auto-detected |
 | `--supply-chain-concurrency <number>` | | Number of concurrent LLM requests | `3` |
 | `--supply-chain-dry-run` | | Skip actual LLM calls (for testing) | `false` |
 | `--version` | | Show version | |
@@ -327,9 +327,43 @@ This will show exactly which packages have provenance and what the registry resp
 ### Environment Variables
 
 - `GITHUB_TOKEN` - Optional GitHub personal access token for higher API rate limits
-- `ANTHROPIC_API_KEY` - API key for Anthropic LLM provider (for supply chain analysis)
-- `OPENAI_API_KEY` - API key for OpenAI LLM provider (for supply chain analysis)
-- `OPENROUTER_API_KEY` - API key for OpenRouter LLM provider (for supply chain analysis)
+- `ANTHROPIC_API_KEY` - API key for Anthropic LLM provider (supply chain analysis)
+- `OPENAI_API_KEY` - API key for OpenAI LLM provider (supply chain analysis)
+- `GOOGLE_API_KEY` - API key for Google Gemini LLM provider (supply chain analysis)
+- `OPENROUTER_API_KEY` - API key for OpenRouter LLM provider (supply chain analysis)
+- `SC_VERBOSE` - Set to `1` for detailed supply chain analysis logging (triage scores, tool calls)
+- `SC_MAX_LLM_FILES` - Maximum files per package sent to LLM (default: `30`)
+
+### Supply Chain LLM Providers
+
+The provider is **auto-detected** from the model name — you usually only need `--supply-chain-model`:
+
+```bash
+# Anthropic (default) — model starts with "claude"
+wtmp --supply-chain --supply-chain-model claude-sonnet-4-5-20250514
+
+# OpenAI — model starts with "gpt" or "o3"
+wtmp --supply-chain --supply-chain-model gpt-5.3-codex
+
+# Gemini (direct Google API) — model starts with "gemini"
+wtmp --supply-chain --supply-chain-model gemini-2.5-pro
+
+# Gemini via OpenRouter — model starts with "google/"
+wtmp --supply-chain --supply-chain-model google/gemini-2.5-pro
+
+# OpenRouter — model contains "/"
+wtmp --supply-chain --supply-chain-model anthropic/claude-sonnet-4-5
+
+# Explicit provider override (if auto-detection doesn't match)
+wtmp --supply-chain --supply-chain-model my-custom-model --llm-provider openai
+```
+
+| Provider | Auto-detected when model... | Env Var | Example Models |
+|----------|---------------------------|---------|----------------|
+| **Anthropic** (default) | starts with `claude` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5-20250514`, `claude-haiku-4-5-20251001` |
+| **OpenAI** | starts with `gpt` / `o1` / `o3` | `OPENAI_API_KEY` | `gpt-5.3-codex`, `gpt-5.4`, `o3`, `o4-mini` |
+| **Gemini** | starts with `gemini` or `google/` | `GOOGLE_API_KEY` | `gemini-2.5-pro`, `gemini-2.5-flash` |
+| **OpenRouter** | contains `/` (other) | `OPENROUTER_API_KEY` | `anthropic/claude-sonnet-4-5`, `openai/gpt-5.3-codex` |
 
 ### Exit Codes
 

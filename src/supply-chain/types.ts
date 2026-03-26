@@ -1,4 +1,5 @@
 import type { Dependency } from '../scanner/types.js';
+import type { LLMProvider } from './llm/models.js';
 
 export type ThreatCategory =
   | 'network-exfiltration'
@@ -74,7 +75,7 @@ export interface SupplyChainReport {
 export interface SupplyChainOptions {
   apiKey?: string;
   model?: string;
-  provider?: 'anthropic' | 'openrouter' | 'openai';
+  provider?: LLMProvider;
   concurrency?: number;
   /** Transitive dependency depth to analyze. 1 = direct deps only (default). */
   depth?: number;

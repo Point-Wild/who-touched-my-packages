@@ -14,7 +14,7 @@ import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency
 import { findDependencyFiles } from './scanner/file-finder.js';
 import { detectLanguages } from './scanner/language-detector.js';
 import type { Dependency, DependencyEdge } from './scanner/types.js';
-import { analyzeSupplyChain, type SupplyChainReport } from './supply-chain/index.js';
+import { analyzeSupplyChain, DEFAULT_MODEL, DEFAULT_CONCURRENCY, type SupplyChainReport } from './supply-chain/index.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -45,9 +45,9 @@ program
   .option('--git-clone-depth <number>', 'Git clone depth (shallow clones)', '0')
   .option('--max-depth <number>', 'Maximum directory recursion depth', '0')
   .option('--supply-chain', 'Enable supply chain security analysis', false)
-  .option('--supply-chain-model <model>', 'LLM model to use for supply chain analysis', 'claude-sonnet-4-5-20241022')
-  .option('--supply-chain-provider <provider>', 'LLM provider (anthropic, openrouter, openai)', 'anthropic')
-  .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', '3')
+  .option('--supply-chain-model <model>', `LLM model for supply chain analysis (default: per-provider, e.g. ${DEFAULT_MODEL})`)
+  .option('--llm-provider <provider>', 'LLM provider — auto-detected from model name when omitted (anthropic, openai, gemini, openrouter)')
+  .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', String(DEFAULT_CONCURRENCY))
   .option('--supply-chain-depth <number>', 'Transitive dependency depth to analyse (1 = direct only)', '1')
   .option('--supply-chain-max-packages <number>', 'Maximum packages to analyse in supply chain scan (0 = unlimited)', '0')
   .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
@@ -259,7 +259,7 @@ async function main() {
     try {
       supplyChainReport = await analyzeSupplyChain(allDependencies, {
         model: options.supplyChainModel,
-        provider: options.supplyChainProvider,
+        provider: options.llmProvider,
         concurrency: parseInt(options.supplyChainConcurrency, 10),
         depth: supplyChainDepth,
         maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),

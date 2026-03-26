@@ -1,25 +1,26 @@
+import { PROVIDERS, DEFAULT_PROVIDER, inferProvider, type LLMProvider } from './llm/models.js';
+
 /**
  * Resolve the LLM API key from (in priority order):
  * 1. options.apiKey passed directly
- * 2. Provider-specific env var (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY)
+ * 2. Provider-specific env var (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, OPENROUTER_API_KEY)
+ *
+ * The provider is auto-inferred from the model name when not specified explicitly.
  */
-export function resolveApiKey(optionsKey?: string, provider?: string): string {
+export function resolveApiKey(optionsKey?: string, provider?: LLMProvider, model?: string): string {
   if (optionsKey) return optionsKey;
 
-  const providerEnvVars: Record<string, string> = {
-    anthropic: 'ANTHROPIC_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    openrouter: 'OPENROUTER_API_KEY',
-  };
-
-  const envVar = providerEnvVars[provider ?? 'anthropic'];
-  const envKey = process.env[envVar];
+  const resolved = provider ?? (model ? inferProvider(model) : undefined) ?? DEFAULT_PROVIDER;
+  const config = PROVIDERS[resolved];
+  const envKey = process.env[config.envVar];
   if (envKey) return envKey;
 
   throw new Error(
-    `No API key found. Set one of:\n` +
+    `No API key found for ${config.name}. Set one of:\n` +
     `  1. Pass apiKey in options\n` +
-    `  2. Set ${envVar} environment variable`
+    `  2. Set ${config.envVar} environment variable\n\n` +
+    `All supported providers and their env vars:\n` +
+    Object.entries(PROVIDERS).map(([id, c]) => `  • ${id}: ${c.envVar}`).join('\n')
   );
 }
 
