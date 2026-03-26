@@ -25,27 +25,27 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
   return (
     <>
       <div className="stats-grid">
-        <div className="stat-card">
+        <div className="stat-card paper">
           <div className="label">Total Vulnerabilities</div>
           <div className="value">{summary.total}</div>
         </div>
-        <div className="stat-card critical">
+        <div className="stat-card critical paper">
           <div className="label">Critical</div>
           <div className="value">{summary.critical}</div>
         </div>
-        <div className="stat-card high">
+        <div className="stat-card high paper">
           <div className="label">High</div>
           <div className="value">{summary.high}</div>
         </div>
-        <div className="stat-card medium">
+        <div className="stat-card medium paper">
           <div className="label">Medium</div>
           <div className="value">{summary.medium}</div>
         </div>
-        <div className="stat-card low">
+        <div className="stat-card low paper">
           <div className="label">Low</div>
           <div className="value">{summary.low}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card paper">
           <div className="label">Scanned Packages</div>
           <div className="value">{data.auditResult.scannedPackages}</div>
         </div>
@@ -65,7 +65,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
       )}
 
       {summary.total > 0 ? (
-        <div className="chart-container" style={{ marginBottom: '2rem' }}>
+        <div className="chart-container paper" style={{ marginBottom: '2rem' }}>
           <h3 style={{ marginBottom: '1rem' }}>Vulnerabilities by Severity</h3>
           <div className="simple-bar-chart">
             <div className="bar-item">
@@ -135,7 +135,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
           </div>
         </div>
       ) : (
-        <div className="empty-state">
+        <div className="empty-state paper">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -145,7 +145,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
       )}
 
       {data.languageStats && data.languageStats.length > 0 && (
-        <div className="chart-container">
+        <div className="chart-container paper">
           <h3 style={{ marginBottom: '1rem' }}>🌐 Languages Detected</h3>
           <div className="simple-bar-chart">
             {data.languageStats.map((lang, idx) => {

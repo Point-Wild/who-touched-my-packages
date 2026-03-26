@@ -64,35 +64,22 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
           placeholder="Search vulnerabilities..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '0.75rem',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            color: 'var(--text-primary)',
-            fontSize: '1rem'
-          }}
+          className="search-input"
         />
-        <select
-          value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
-          style={{
-            padding: '0.75rem',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            color: 'var(--text-primary)',
-            fontSize: '1rem'
-          }}
-        >
-          <option value="all">All Severities</option>
-          <option value="CRITICAL">Critical</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-          <option value="UNKNOWN">Unknown</option>
-        </select>
+        <div className="select-wrapper">
+          <select
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">All Severities&nbsp;&nbsp;&nbsp;</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+            <option value="UNKNOWN">Unknown</option>
+          </select>
+        </div>
         <ExportButton
           data={filteredVulns}
           filename="vulnerabilities"
@@ -117,7 +104,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
             </thead>
             <tbody>
               {filteredVulns.map((vuln, idx) => (
-                <tr key={idx}>
+                <tr key={idx} className={`row-${vuln.severity.toLowerCase()}`}>
                   <td>
                     <span className={`severity-badge ${vuln.severity.toLowerCase()}`}>
                       {vuln.severity}
@@ -136,8 +123,8 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                     <code style={{ fontSize: '0.875rem' }}>{vuln.packageVersion}</code>
                   </td>
                   <td>
-                    <div style={{ marginBottom: '0.5rem' }}>{vuln.title}</div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ marginBottom: '0.2rem' }}>{vuln.title}</div>
+                    <div style={{ display: 'flex', gap: '0', flexWrap: 'wrap' }}>
                       {vuln.references.map((ref, i) => {
                         const getLabel = () => {
                           if (ref.includes('cve.org')) return 'CVE';
