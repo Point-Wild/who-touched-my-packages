@@ -22,6 +22,8 @@ This document lists all vulnerability data sources that can be integrated into *
 - Detailed affected version ranges
 - Fix version information
 
+## Planned Data Sources
+
 ### 2. GitHub Advisory Database
 - **Provider**: GitHub
 - **URL**: https://github.com/advisories
@@ -40,8 +42,6 @@ This document lists all vulnerability data sources that can be integrated into *
 - CWE classifications
 - Detailed descriptions and references
 - First patched version information
-
-## Planned Data Sources
 
 ### 3. npm Audit API
 - **Provider**: npm
@@ -140,7 +140,7 @@ This document lists all vulnerability data sources that can be integrated into *
 - Includes IoT vulnerabilities from VARIoT database
 
 **Data Sources Included**:
-- NIST NVD, CISA KEV, GitHub Advisory Database
+- NIST NVD, CISA KEV
 - PySec, CVEProject, Cloud Security Alliance GSD
 - OpenSSF Malicious Packages
 - CSAF feeds (CERT-Bund, Cisco, Red Hat, Siemens, etc.)
