@@ -22,7 +22,10 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   { name: 'socket-import', category: 'network', pattern: /import\s+socket|require\s*\(\s*['"]net['"]\)|from\s+['"]net['"]/gi, weight: 2 },
   { name: 'dns-exfil', category: 'network', pattern: /dns\.resolve|dns\.lookup|\.resolveAny|\.resolveTxt/gi, weight: 3 },
   { name: 'external-url', category: 'network', pattern: /https?:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0|registry\.npmjs\.org|github\.com|gitlab\.com|npmjs\.com|pypi\.org|jfrog\.io|amazonaws\.com|docker\.io|docker\.com|googleapis\.com|cloudflare\.com|w3\.org|schema\.org|spdx\.org|creativecommons\.org|opensource\.org|example\.com|json-schema\.org|xml\.org|ietf\.org|swagger\.io|openapis\.org|microsoft\.com|apple\.com|google\.com|mozilla\.org)[a-z0-9][-a-z0-9.]*\.[a-z]{2,}/gi, weight: 0 },
-  { name: 'known-c2', category: 'network', pattern: /models\.litellm\.cloud|checkmarx\.zone|pastebin\.com\/raw|transfer\.sh|ngrok\.io|requestbin|pipedream/gi, weight: 4 },
+  { name: 'known-c2', category: 'network', pattern: /models\.litellm\.cloud|checkmarx\.zone|pastebin\.com\/raw|transfer\.sh|ngrok\.io|requestbin|pipedream|oastify\.com|oast\.fun|oast\.pro|oast\.me|oast\.site|interactsh\.com|burpcollaborator|canarytokens|resolver-io\.net/gi, weight: 6 },
+  { name: 'telegram-exfil', category: 'network', pattern: /api\.telegram\.org|t\.me\/|sendMessage.*chat_id|bot.*token.*telegram/gi, weight: 4 },
+  { name: 'discord-webhook', category: 'network', pattern: /discord\.com\/api\/webhooks|discordapp\.com\/api\/webhooks/gi, weight: 4 },
+  { name: 'suspicious-tld', category: 'network', pattern: /https?:\/\/[^\s'"]+\.(xyz|top|tk|ml|ga|cf|gq|pw|ru|su)[\/'"\\s]/gi, weight: 2 },
   { name: 'metadata-endpoint', category: 'network', pattern: /169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com/gi, weight: 4 },
 
   // ── Credential Harvesting ─────────────────────────────────
@@ -51,11 +54,22 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   { name: 'dynamic-exec', category: 'exec', pattern: /new\s+Function\s*\(|eval\s*\((?!uate)|exec\s*\([^)]*(?:\.toString|base64|decode|atob|compile)/gi, weight: 3 },
   { name: 'subprocess-launch', category: 'exec', pattern: /subprocess\.(?:Popen|run|call|check_output)\s*\(\s*\[.*?['"]\-c['"]|os\.(?:system|popen)\s*\(/gis, weight: 4 },
   { name: 'base64-decode-exec', category: 'exec', pattern: /Buffer\.from\([^)]+,\s*['"]base64['"]\)\s*\.toString|atob\s*\(|base64\.b64decode|base64\.decode/gi, weight: 3 },
-  { name: 'marshal-pickle', category: 'exec', pattern: /marshal\.loads|pickle\.loads|yaml\.load\([^)]*Loader/gi, weight: 3 },
+  { name: 'marshal-pickle', category: 'exec', pattern: /marshal\.loads|pickle\.loads|dill\.loads|cPickle\.loads|yaml\.load\([^)]*Loader/gi, weight: 3 },
   { name: 'dynamic-import', category: 'exec', pattern: /__import__\s*\(|importlib\.import_module|require\s*\(\s*[^'"]/gi, weight: 2 },
+  { name: 'python-pip-install', category: 'exec', pattern: /\bpip\s+install\b|\bpip3\s+install\b|subprocess.*pip.*install/gi, weight: 4 },
+  { name: 'python-codecs-decode', category: 'exec', pattern: /codecs\.decode\s*\([^)]*['"]rot.?13['"]|codecs\.decode\s*\([^)]*['"]hex/gi, weight: 4 },
+  { name: 'python-compile-exec', category: 'exec', pattern: /compile\s*\([^)]+\)\s*\n?\s*exec\s*\(|exec\s*\(\s*compile\s*\(/gi, weight: 4 },
+  { name: 'python-setup-override', category: 'install', pattern: /setuptools\.command\.install|cmdclass\s*=\s*\{[^}]*['"]install['"]|setuptools\.command\.develop/gi, weight: 3 },
+  { name: 'python-pty-spawn', category: 'exec', pattern: /pty\.spawn\s*\(/gi, weight: 5 },
+  { name: 'python-os-system', category: 'exec', pattern: /os\.system\s*\(|os\.popen\s*\(/gi, weight: 2 },
+  { name: 'python-socket-connect', category: 'network', pattern: /socket\.socket\s*\([^)]*\)[\s\S]{0,200}\.connect\s*\(|socket\.create_connection\s*\(/gis, weight: 3 },
+  { name: 'python-urllib', category: 'network', pattern: /urllib\.urlopen|urllib2\.urlopen|urllib\.request\.urlopen|urlopen\s*\(/gi, weight: 2 },
   { name: 'string-concat-hide', category: 'exec', pattern: /\.join\s*\(\s*['"]['"]?\s*\).*require|\.join\s*\(\s*['"]['"]?\s*\).*https?/gi, weight: 3 },
   { name: 'hex-base64-blob', category: 'exec', pattern: /[A-Za-z0-9+/=]{200,}|\\x[0-9a-f]{2}(\\x[0-9a-f]{2}){20,}/gi, weight: 3 },
+  { name: 'string-fromcharcode', category: 'exec', pattern: /String\.fromCharCode\s*\(\s*\d+\s*(,\s*\d+\s*){3,}/gi, weight: 3 },
+  { name: 'encoded-powershell', category: 'exec', pattern: /powershell.*-[Ee]ncoded[Cc]ommand|FromBase64String|System\.Convert/gi, weight: 4 },
   { name: 'child-process', category: 'exec', pattern: /require\s*\(\s*['"]child_process['"]\)|child_process\.exec|execSync\s*\(|spawnSync\s*\(/gi, weight: 2 },
+  { name: 'discord-token-steal', category: 'creds', pattern: /Discord.*token|token.*Discord|isValidDiscordToken|extractAllTokens|discord.*leveldb/gi, weight: 5 },
 
   // ── Build / Install Hooks ─────────────────────────────────
   { name: 'install-script', category: 'install', pattern: /["']?preinstall["']?\s*:|["']?postinstall["']?\s*:|["']?preuninstall["']?\s*:/gi, weight: 3 },
@@ -226,6 +240,43 @@ export function runTriage(allContent: Map<string, string>): TriageResult[] {
       entry.score = Math.round(entry.score * 2.5);
     } else if (catCount >= 2) {
       entry.score = Math.round(entry.score * 1.8);
+    }
+  }
+
+  // Combo bonuses: known-malicious indicator combinations
+  const NETWORK_NAMES = new Set([
+    'http-request-api', 'http-post-data', 'curl-wget-nc', 'fetch-xhr', 'socket-connect',
+    'dns-exfil', 'known-c2', 'metadata-endpoint', 'telegram-exfil', 'discord-webhook',
+    'suspicious-tld', 'python-urllib', 'python-socket-connect',
+  ]);
+  const EXEC_NAMES = new Set([
+    'dynamic-exec', 'subprocess-launch', 'child-process', 'dynamic-import',
+    'python-compile-exec', 'python-os-system', 'python-pty-spawn', 'python-pip-install',
+  ]);
+  for (const [, entry] of fileScores) {
+    const names = entry.indicators;
+    const hasNetwork = [...names.keys()].some(n => NETWORK_NAMES.has(n));
+    const hasExec = [...names.keys()].some(n => EXEC_NAMES.has(n));
+
+    // install-hook + any network or exec → +10
+    if (names.has('install-script') && (hasNetwork || hasExec)) {
+      entry.score += 10;
+    }
+    // env-bulk-dump or credential-files + any network → +8
+    if ((names.has('env-bulk-dump') || names.has('credential-files')) && hasNetwork) {
+      entry.score += 8;
+    }
+    // base64-decode + exec → +6
+    if (names.has('base64-decode-exec') && hasExec) {
+      entry.score += 6;
+    }
+    // child-process + curl/wget → +6
+    if (names.has('child-process') && names.has('curl-wget-nc')) {
+      entry.score += 6;
+    }
+    // known-c2 should always cross threshold 8
+    if (names.has('known-c2') && entry.score < 8) {
+      entry.score = 8;
     }
   }
 
