@@ -6,7 +6,7 @@ A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities
 
 - 🔍 **Recursive scanning** - Finds all `package.json` and `requirements.txt` files in your project
 - 🐙 **Remote repository scanning** - Clone and scan any Git repository directly
-- 🌐 **Multiple data sources** - Queries OSV and GitHub Advisory Database for comprehensive coverage
+- 🌐 **Multiple data sources** - Queries OSV for comprehensive coverage
 - 🔐 **Provenance verification** - Checks for SLSA provenance attestations on npm and PyPI packages
 - 🎨 **Beautiful UI** - Colorful, emoji-rich terminal output with light/dark mode detection
 - 📊 **Detailed reports** - Shows severity, CVSS scores, affected versions, and fix information
@@ -256,7 +256,6 @@ By Severity:
 
 Currently integrated:
 - **OSV (Open Source Vulnerabilities)** - Google's comprehensive vulnerability database
-- **GitHub Advisory Database** - GitHub's curated security advisories
 
 See [datasources.md](./datasources.md) for details on all current and planned data sources.
 
@@ -323,7 +322,7 @@ WTMP_DEBUG=1 wtmp --path /your/project
 
 This will show exactly which packages have provenance and what the registry responses contain.
 
-## �🔧 Configuration
+## �� Configuration
 
 ### Environment Variables
 
@@ -400,7 +399,6 @@ MIT
 ## 🙏 Acknowledgments
 
 - [OSV](https://osv.dev) - Open Source Vulnerabilities database
-- [GitHub Advisory Database](https://github.com/advisories) - Security advisories
 - [@clack/prompts](https://github.com/natemoo-re/clack) - Beautiful CLI prompts
 - [picocolors](https://github.com/alexeyraspopov/picocolors) - Terminal colors
 
