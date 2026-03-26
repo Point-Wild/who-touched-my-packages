@@ -32,7 +32,7 @@ wtmp
 The tool will:
 1. Recursively find all `package.json` and `requirements.txt` files
 2. Parse the dependencies
-3. Query OSV and GitHub Advisory databases
+3. Query OSV
 4. Display a beautiful report
 
 ### Example: Scanning a Node.js Project
@@ -82,7 +82,6 @@ Prototype pollution vulnerability in lodash...
 
 References:
   • https://nvd.nist.gov/vuln/detail/CVE-2023-12345
-  • https://github.com/advisories/GHSA-xxxx-yyyy-zzzz
 
 Source: OSV
 ```

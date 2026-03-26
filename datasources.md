@@ -140,7 +140,7 @@ This document lists all vulnerability data sources that can be integrated into *
 - Includes IoT vulnerabilities from VARIoT database
 
 **Data Sources Included**:
-- NIST NVD, CISA KEV, GitHub Advisory Database
+- NIST NVD, CISA KEV
 - PySec, CVEProject, Cloud Security Alliance GSD
 - OpenSSF Malicious Packages
 - CSAF feeds (CERT-Bund, Cisco, Red Hat, Siemens, etc.)
