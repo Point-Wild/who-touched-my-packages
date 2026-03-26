@@ -29,6 +29,9 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
   <Card title="Multiple Data Sources" icon="random">
     Queries OSV and GitHub Advisory Database for comprehensive vulnerability coverage
   </Card>
+  <Card title="Provenance Verification" icon="approve-check">
+    Automatically checks for SLSA provenance attestations to verify package integrity
+  </Card>
   <Card title="Beautiful UI" icon="star">
     Colorful, emoji-rich terminal output with automatic light/dark mode detection
   </Card>
@@ -41,7 +44,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
   <Card title="Recursive Scanning" icon="document">
     Automatically finds all dependency files in your project tree
   </Card>
-  <Card title="Fast & Efficient" icon="approve-check">
+  <Card title="Fast & Efficient" icon="lightning">
     Parallel API requests and smart caching for quick scans
   </Card>
   <Card title="Extensible" icon="seti:config">
@@ -104,5 +107,7 @@ Total Vulnerabilities: 3
   <Card title="Quick Start" icon="open-book">
     Learn the [basics](/who-touched-my-packages/quick-start/) and scan your first project
   </Card>
-
+  <Card title="Provenance Verification" icon="approve-check">
+    Understand [how provenance checking works](/who-touched-my-packages/features/provenance/) and why it matters
+  </Card>
 </CardGrid>

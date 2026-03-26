@@ -7,6 +7,7 @@ A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities
 - 🔍 **Recursive scanning** - Finds all `package.json` and `requirements.txt` files in your project
 - 🐙 **Remote repository scanning** - Clone and scan any Git repository directly
 - 🌐 **Multiple data sources** - Queries OSV and GitHub Advisory Database for comprehensive coverage
+- 🔐 **Provenance verification** - Checks for SLSA provenance attestations on npm and PyPI packages
 - 🎨 **Beautiful UI** - Colorful, emoji-rich terminal output with light/dark mode detection
 - 📊 **Detailed reports** - Shows severity, CVSS scores, affected versions, and fix information
 - 📄 **Interactive HTML reports** - Beautiful HTML reports with charts, tables, and dependency graphs (default output)
@@ -259,7 +260,70 @@ Currently integrated:
 
 See [datasources.md](./datasources.md) for details on all current and planned data sources.
 
-## 🔧 Configuration
+## � Provenance Verification
+
+The tool automatically verifies package provenance to help ensure supply chain security. This feature checks whether packages have cryptographic attestations proving their build integrity and origin.
+
+### How It Works
+
+**For npm packages:**
+- Queries the npm registry for each package
+- Checks for SLSA provenance attestations in `dist.attestations.provenance`
+- Only packages with `predicateType: "https://slsa.dev/provenance/v1"` are marked as verified
+- Old PGP signatures (`dist.signatures`) are **not** considered provenance
+
+**For PyPI packages:**
+- Queries PyPI's JSON API for each package
+- Checks for PEP 740 attestations in the release metadata
+- Looks for attestation objects in the `urls` array
+
+### What You'll See
+
+**Terminal output:**
+```
+════════════════════════════════════════════════════════════
+🛡️ Provenance Verification
+════════════════════════════════════════════════════════════
+
+✅ 19 packages with provenance
+⚠️ 26 packages without provenance
+
+Packages without provenance:
+  • commander@11.1.0
+  • express@4.18.0
+  • lodash@4.17.21
+  ... and 23 more
+
+════════════════════════════════════════════════════════════
+```
+
+**HTML report:**
+- **Provenance column** in the Dependencies tab showing:
+  - ✓ Verified (green) - Package has SLSA provenance attestations
+  - ⚠️ Missing (red) - No provenance attestations found
+  - Unknown (gray) - Verification failed or package not checked
+- **"No provenance only" filter** to show packages lacking attestations
+- **CSV export** includes provenance status
+
+### Why Provenance Matters
+
+Provenance attestations provide cryptographic proof that:
+- The package was built from specific source code
+- The build process is reproducible and auditable
+- The package hasn't been tampered with after building
+
+Packages without provenance are not necessarily malicious, but they lack this additional layer of supply chain security verification.
+
+### Debug Mode
+
+Enable detailed provenance checking logs:
+```bash
+WTMP_DEBUG=1 wtmp --path /your/project
+```
+
+This will show exactly which packages have provenance and what the registry responses contain.
+
+## �🔧 Configuration
 
 ### Environment Variables
 
