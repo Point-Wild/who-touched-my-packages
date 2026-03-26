@@ -103,15 +103,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
           placeholder="Search dependencies..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '0.75rem',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            color: 'var(--text-primary)',
-            fontSize: '1rem'
-          }}
+          className="search-input"
         />
         <label style={{
           display: 'flex', alignItems: 'center', gap: '6px',
@@ -122,7 +114,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
             type="checkbox"
             checked={showVulnerableOnly}
             onChange={e => setShowVulnerableOnly(e.target.checked)}
-            style={{ accentColor: 'var(--accent-rose)', width: '14px', height: '14px', cursor: 'pointer' }}
+            style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px', cursor: 'pointer' }}
           />
           Vulnerable only
         </label>

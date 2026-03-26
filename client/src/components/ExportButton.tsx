@@ -86,18 +86,20 @@ export function ExportButton<T extends object>({ data, filename, csvHeaders }: E
     <div ref={dropdownRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        className="export-button"
         style={{
-          padding: '0.75rem 1rem',
-          background: 'var(--bg-tertiary)',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          color: 'var(--text-primary)',
-          fontSize: '0.875rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          whiteSpace: 'nowrap',
+          // padding: '0.75rem 1rem',
+          // background: 'var(--bg-tertiary)',
+          // border: '1px solid var(--border)',
+          borderColor: isOpen ? 'var(--accent-blue)' : 'var(--border)',
+          // borderRadius: '8px',
+          // color: 'var(--text-primary)',
+          // fontSize: '0.875rem',
+          // cursor: 'pointer',
+          // display: 'flex',
+          // alignItems: 'center',
+          // gap: '0.5rem',
+          // whiteSpace: 'nowrap',
         }}
       >
         <svg
@@ -125,8 +127,8 @@ export function ExportButton<T extends object>({ data, filename, csvHeaders }: E
             top: 'calc(100% + 4px)',
             right: 0,
             background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
+            border: '1px solid var(--accent-blue)',
+            borderRadius: 'var(--radius-badge)',
             padding: '4px',
             minWidth: '120px',
             zIndex: 100,

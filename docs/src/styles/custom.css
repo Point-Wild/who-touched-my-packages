@@ -64,7 +64,7 @@ header.header {
     padding: 1px;
     border-radius: inherit;
     background: linear-gradient(-10deg, #34405147, #E4E7EC47);
-    mask: conic-gradient(#000 0 0) content-box exclude, conic-gradient(#000 0 0)
+    mask: conic-gradient(#000 0 0) content-box exclude, conic-gradient(#000 0 0);
 }
 
 .expressive-code .frame.is-terminal {

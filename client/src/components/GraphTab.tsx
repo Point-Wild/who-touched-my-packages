@@ -178,29 +178,23 @@ export function GraphTab({ data }: GraphTabProps) {
         <label style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 600 }}>
           Filter by file:
         </label>
-        <select
-          value={selectedFile}
-          onChange={(e) => setSelectedFile(e.target.value)}
-          style={{
-            padding: '0.5rem',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            color: 'var(--text-primary)',
-            fontSize: '14px',
-            minWidth: '300px',
-          }}
-        >
-          <option value="all">All Files ({data.dependencies.length} dependencies)</option>
-          {packageFiles.map(file => {
-            const count = data.dependencies.filter(d => d.file === file).length;
-            return (
-              <option key={file} value={file}>
-                {file} ({count} dependencies)
-              </option>
-            );
-          })}
-        </select>
+        <div className="select-wrapper">
+          <select
+            value={selectedFile}
+            onChange={(e) => setSelectedFile(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">All Files ({data.dependencies.length} dependencies)</option>
+            {packageFiles.map(file => {
+              const count = data.dependencies.filter(d => d.file === file).length;
+              return (
+                <option key={file} value={file}>
+                  {file} ({count} dependencies)
+                </option>
+              );
+            })}
+          </select>
+        </div>
       </div>
 
       {error && (
