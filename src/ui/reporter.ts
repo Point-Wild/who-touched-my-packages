@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
 import type { Dependency, DependencyEdge, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatSummary, formatVulnerability } from './formatters.js';
@@ -10,6 +11,7 @@ export interface ReporterOptions {
   verbose?: boolean;
   html?: boolean;
   supplyChain?: boolean;
+  output?: string;
 }
 
 export class Reporter {
@@ -161,7 +163,16 @@ export class Reporter {
       })),
     };
     
-    console.log(JSON.stringify(output, null, 2));
+    const jsonString = JSON.stringify(output, null, 2);
+    
+    if (this.options.output) {
+      writeFile(this.options.output, jsonString).catch((err) => {
+        console.error(`Failed to write output file: ${err.message}`);
+        process.exit(1);
+      });
+    } else {
+      console.log(jsonString);
+    }
   }
   
   private filterBySeverity(vulnerabilities: Vulnerability[]) {

@@ -47,6 +47,7 @@ export interface SupplyChainOptions {
   model?: string;
   provider?: 'anthropic' | 'openrouter' | 'openai';
   concurrency?: number;
+  dryRun?: boolean;
 }
 
 export interface PackageMetadata {

@@ -1,5 +1,11 @@
-import pc from 'picocolors';
 import { env } from 'node:process';
+import pc from 'picocolors';
+
+let disableColors = false;
+
+export function setColorEnabled(enabled: boolean): void {
+  disableColors = !enabled;
+}
 
 export interface Theme {
   critical: (text: string) => string;
@@ -35,6 +41,21 @@ function detectColorMode(): 'light' | 'dark' {
 export function createTheme(): Theme {
   const mode = detectColorMode();
   
+  // Return no-op functions when colors are disabled
+  if (disableColors) {
+    return {
+      critical: (text: string) => text,
+      high: (text: string) => text,
+      medium: (text: string) => text,
+      low: (text: string) => text,
+      success: (text: string) => text,
+      info: (text: string) => text,
+      dim: (text: string) => text,
+      bold: (text: string) => text,
+      underline: (text: string) => text,
+    };
+  }
+  
   return {
     critical: (text: string) => pc.red(pc.bold(text)),
     high: (text: string) => pc.yellow(pc.bold(text)),
@@ -48,7 +69,11 @@ export function createTheme(): Theme {
   };
 }
 
-export const theme = createTheme();
+export let theme = createTheme();
+
+export function recreateTheme(): void {
+  theme = createTheme();
+}
 
 export function getSeverityColor(severity: string): (text: string) => string {
   switch (severity.toUpperCase()) {
