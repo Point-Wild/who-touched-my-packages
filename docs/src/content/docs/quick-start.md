@@ -353,10 +353,11 @@ Then run with supply chain analysis:
 ```bash
 wtmp --supply-chain
 ```
-
+<!--
 ## Next Steps
 
 - Learn about [all CLI options](/usage/cli-options/)
 - Set up [CI/CD integration](/usage/ci-cd/)
 - Understand the [data sources](/data-sources/overview/)
 - Learn how to [filter results](/guides/filtering/)
+-->

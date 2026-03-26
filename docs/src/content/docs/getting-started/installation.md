@@ -74,6 +74,4 @@ wtmp --help
 
 ## Next Steps
 
-- [Quick Start Guide](/quick-start/) - Run your first scan
-- [Command Line Options](/usage/cli-options/) - Learn all available options
-- [CI/CD Integration](/usage/ci-cd/) - Set up automated scanning
+- [Quick Start Guide](/who-touched-my-packages/quick-start/) - Run your first scan
