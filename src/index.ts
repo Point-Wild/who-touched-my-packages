@@ -5,6 +5,7 @@ import { cwd } from 'node:process';
 import open from 'open';
 import ora from 'ora';
 
+import * as Package from "../package.json" assert { type: "json" };
 import { GitHubDataSource, OSVDataSource } from './auditor/datasources/index.js';
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
 import { parseDependencies } from './scanner/dependency-parser.js';
@@ -24,7 +25,7 @@ const program = new Command();
 program
   .name('who-touched-my-packages')
   .description('A beautiful CLI tool for auditing dependencies and finding vulnerabilities')
-  .version('0.1.0')
+  .version(Package.version)
   .option('-p, --path <directory>', 'Path to scan (default: current directory)', '.')
   .option('-r, --repo <url>', 'Git repository URL to clone and scan')
   .option('-b, --branch <name>', 'Branch to checkout when cloning repository')
