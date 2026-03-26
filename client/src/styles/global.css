@@ -393,7 +393,7 @@ tr:hover {
 .bar-container {
   flex: 1;
   height: 30px;
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   border-radius: 6px;
   overflow: hidden;
   position: relative;
@@ -551,4 +551,18 @@ input[type="text"]:focus,
 select:focus {
   outline: none;
   border-color: var(--accent-blue);
+}
+
+.react-flow__controls-button {
+  background-color: var(--bg-tertiary) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+}
+.react-flow__controls-button:first-child {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+}
+.react-flow__controls-button:last-child {
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
 }

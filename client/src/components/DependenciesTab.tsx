@@ -127,7 +127,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
             type="checkbox"
             checked={showNoProvenanceOnly}
             onChange={e => setShowNoProvenanceOnly(e.target.checked)}
-            style={{ accentColor: 'var(--accent-rose)', width: '14px', height: '14px', cursor: 'pointer' }}
+            style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px', cursor: 'pointer' }}
           />
           No provenance only
         </label>
