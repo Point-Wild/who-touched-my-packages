@@ -48,7 +48,8 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   { name: 'env-secrets-named', category: 'env', pattern: /AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN|GITHUB_TOKEN|NPM_TOKEN|ARTIFACTORY_CREDS|OPENAI_API_KEY|STRIPE_SECRET_KEY|SLACK_TOKEN|DATABASE_URL|VAULT_TOKEN/gi, weight: 1 },
 
   // ── Code Obfuscation / Dynamic Execution ──────────────────
-  { name: 'dynamic-exec', category: 'exec', pattern: /new\s+Function\s*\(|eval\s*\((?!uate)|exec\s*\([^)]*\.toString/gi, weight: 3 },
+  { name: 'dynamic-exec', category: 'exec', pattern: /new\s+Function\s*\(|eval\s*\((?!uate)|exec\s*\([^)]*(?:\.toString|base64|decode|atob|compile)/gi, weight: 3 },
+  { name: 'subprocess-launch', category: 'exec', pattern: /subprocess\.(?:Popen|run|call|check_output)\s*\(\s*\[.*?['"]\-c['"]|os\.(?:system|popen)\s*\(/gis, weight: 4 },
   { name: 'base64-decode-exec', category: 'exec', pattern: /Buffer\.from\([^)]+,\s*['"]base64['"]\)\s*\.toString|atob\s*\(|base64\.b64decode|base64\.decode/gi, weight: 3 },
   { name: 'marshal-pickle', category: 'exec', pattern: /marshal\.loads|pickle\.loads|yaml\.load\([^)]*Loader/gi, weight: 3 },
   { name: 'dynamic-import', category: 'exec', pattern: /__import__\s*\(|importlib\.import_module|require\s*\(\s*[^'"]/gi, weight: 2 },
