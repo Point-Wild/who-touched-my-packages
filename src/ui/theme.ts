@@ -103,3 +103,70 @@ export const icons = {
   search: '🔍',
   shield: '🛡️',
 };
+
+function supportsHyperlinks(): boolean {
+  if (disableColors) return false;
+  
+  const term = env.TERM_PROGRAM;
+  const termVersion = env.TERM_PROGRAM_VERSION;
+  
+  if (term === 'iTerm.app') {
+    return true;
+  }
+  
+  if (term === 'WezTerm') {
+    return true;
+  }
+  
+  if (term === 'vscode') {
+    return true;
+  }
+  
+  if (env.TERM?.includes('kitty')) {
+    return true;
+  }
+  
+  if (env.VTE_VERSION) {
+    const version = parseInt(env.VTE_VERSION, 10);
+    return version >= 5000;
+  }
+  
+  return false;
+}
+
+export function hexToAnsi(color: string): string {
+  if (color.startsWith('#')) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+      return `\x1b[38;2;${r};${g};${b}m`;
+    } else {
+      return `\x1b[34m`;
+    }
+  }
+  
+  return ``;
+}
+
+export function createHyperlink(url: string, text: string, color?: string): string {
+  if (disableColors) {
+    return `${text} (${url})`;
+  }
+  
+  const supportsLinks = supportsHyperlinks();
+  
+  let formattedText = text;
+
+  if (color) {
+    formattedText = hexToAnsi(color) + text + "\x1b[0m";
+  }
+  
+  if (supportsLinks) {
+    return `\x1b]8;;${url}\x1b\\${formattedText}\x1b]8;;\x1b\\`;
+  } else {
+    return `${formattedText} (${url})`;
+  }
+}
+

@@ -97,7 +97,7 @@ async function main() {
         });
         scanPath = cloneResult.path;
         cleanup = cloneResult.cleanup;
-        spinner.succeed(`Repository cloned to ${scanPath}`);
+        spinner.succeed(` Repository cloned to ${scanPath}`);
       } catch (error) {
         spinner.fail('Failed to clone repository');
         throw error;
@@ -336,7 +336,7 @@ async function main() {
     // Don't exit - keep server running
     return;
   } else {
-    reporter.reportResults(result, files, dependencies, supplyChainReport);
+    reporter.reportResults(result, files, dependencies, supplyChainReport, options.repo);
   }
   
   if (cleanup) {

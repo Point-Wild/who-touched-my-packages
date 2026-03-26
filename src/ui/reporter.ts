@@ -3,7 +3,7 @@ import type { AuditResult, Vulnerability } from '../auditor/types.js';
 import type { Dependency, DependencyEdge, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatProvenanceSummary, formatSummary, formatVulnerability } from './formatters.js';
 import type { ReportData } from './html-report/types.js';
-import { theme } from './theme.js';
+import { createHyperlink, theme } from './theme.js';
 
 export interface ReporterOptions {
   json?: boolean;
@@ -33,17 +33,18 @@ export class Reporter {
     result: AuditResult,
     files?: DependencyFile[],
     dependencies?: Dependency[],
-    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport
+    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport,
+    repositoryUrl?: string
   ): void {
     if (this.options.json) {
       this.reportJson(result);
       return;
     }
     
-    this.reportTerminal(result, files, dependencies);
+    this.reportTerminal(result, files, dependencies, repositoryUrl);
   }
   
-  private reportTerminal(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+  private reportTerminal(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[], repositoryUrl?: string): void {
     // Show scan overview first
     if (files && dependencies) {
       console.log(formatFileList(files));
@@ -60,7 +61,7 @@ export class Reporter {
     }
     
     if (result.vulnerabilities.length === 0) {
-      this.showFinalSummary(result, files, dependencies);
+      this.showFinalSummary(result, files, dependencies, repositoryUrl);
       return;
     }
     
@@ -77,7 +78,7 @@ export class Reporter {
       } else {
         console.log(theme.dim('\nAll findings have insufficient information. Use --verbose to see them.\n'));
       }
-      this.showFinalSummary(result, files, dependencies);
+      this.showFinalSummary(result, files, dependencies, repositoryUrl);
       return;
     }
     
@@ -95,10 +96,10 @@ export class Reporter {
       console.log(theme.dim(`\n💡 ${hiddenCount} additional finding(s) with limited information hidden. Use --verbose to see all.\n`));
     }
     
-    this.showFinalSummary(result, files, dependencies);
+    this.showFinalSummary(result, files, dependencies, repositoryUrl);
   }
   
-  private showFinalSummary(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[]): void {
+  private showFinalSummary(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[], repositoryUrl?: string): void {
     console.log('\n' + theme.bold('═'.repeat(60)));
     console.log(theme.bold(`📊 Final Summary`));
     console.log(theme.bold('═'.repeat(60)));
@@ -144,6 +145,11 @@ export class Reporter {
     }
     
     console.log(''); // Add final newline
+    
+    if (repositoryUrl) {
+      console.log(theme.dim('Repository: ') + createHyperlink(repositoryUrl, repositoryUrl, '#3D7FF3'));
+    }
+    console.log(theme.dim("Powered By: ") + createHyperlink('https://ThreatPoint.com', 'https://ThreatPoint.com', '#3D7FF3') + '\n');
   }
   
   private reportJson(result: AuditResult): void {
