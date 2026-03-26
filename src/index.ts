@@ -47,6 +47,8 @@ program
   .option('--supply-chain-model <model>', 'LLM model to use for supply chain analysis', 'claude-sonnet-4-5-20241022')
   .option('--supply-chain-provider <provider>', 'LLM provider (anthropic, openrouter, openai)', 'anthropic')
   .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', '3')
+  .option('--supply-chain-depth <number>', 'Transitive dependency depth to analyse (1 = direct only)', '1')
+  .option('--supply-chain-max-packages <number>', 'Maximum packages to analyse in supply chain scan (0 = unlimited)', '0')
   .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
   .parse();
 
@@ -154,24 +156,27 @@ async function main() {
     output: options.output,
   });
   
-  // Build dependency trees for graph visualization
+  // Build dependency trees for graph visualization and/or transitive supply chain scanning
   let allDependencies: Dependency[] = dependencies;
   let dependencyEdges: DependencyEdge[] = [];
-  
-  if (options.html) {
+
+  const supplyChainDepth = parseInt(options.supplyChainDepth ?? '1', 10);
+  const needsTree = options.html || (options.supplyChain && supplyChainDepth > 1);
+
+  if (needsTree) {
     if (spinner) {
       spinner.text = 'Building dependency trees...';
     }
-    
+
     const npmFiles = files.filter(f => f.type === 'package.json');
     const pythonFiles = files.filter(f => f.type === 'requirements.txt');
     const allTreeNodes = new Map<string, Dependency>();
-    
+
     for (const file of npmFiles) {
       try {
         const tree = await buildDependencyTree(file.path, 'npm');
         const flatDeps = flattenDependencyTree(tree);
-        
+
         flatDeps.forEach(dep => {
           const key = `${dep.name}@${dep.version}`;
           if (!allTreeNodes.has(key)) {
@@ -184,13 +189,13 @@ async function main() {
             }
           }
         });
-        
+
         dependencyEdges.push(...tree.edges);
       } catch (error) {
         // Skip files that fail to parse
       }
     }
-    
+
     // Include Python dependencies in the graph (flat list, no deep tree resolution yet)
     for (const file of pythonFiles) {
       const pythonDeps = dependencies.filter(d => d.file === file.path && d.ecosystem === 'pypi');
@@ -201,8 +206,13 @@ async function main() {
         }
       }
     }
-    
+
     allDependencies = Array.from(allTreeNodes.values());
+
+    // When supply chain scanning at depth > 1, filter to the requested depth
+    if (options.supplyChain && supplyChainDepth > 1) {
+      allDependencies = allDependencies.filter(d => (d.depth ?? 0) < supplyChainDepth);
+    }
   }
   
   if (dependencies.length === 0) {
@@ -232,6 +242,8 @@ async function main() {
         model: options.supplyChainModel,
         provider: options.supplyChainProvider,
         concurrency: parseInt(options.supplyChainConcurrency, 10),
+        depth: supplyChainDepth,
+        maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
         dryRun: options.supplyChainDryRun,
       }, (stage, done, total) => {
         if (spinner) {

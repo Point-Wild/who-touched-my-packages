@@ -89,6 +89,22 @@ You are given a specific file that was flagged by an automated triage scan. The 
 - tar/zip archives + AES/RSA encryption or openssl enc before exfiltration
 - Known campaign artifact names (tpcp.tar.gz, payload.enc)
 
+**Dormancy / Time-bombs**
+- Code that only activates after a specific date: \`new Date().getFullYear() > 2025\`, \`Date.now() > 1800000000000\`
+- Large \`setTimeout\` or \`setInterval\` delays (>100 seconds) triggering malicious code
+- OS-conditional execution: code that runs \`exec()\` only on Linux or only on Windows
+- These are used to evade detection during initial review
+
+**Trojan Source (CVE-2021-42574) / Unicode Tricks**
+- Unicode bidirectional override characters (U+202A–U+202E, U+2066–U+2069) that make code appear different to human reviewers than to the compiler
+- Zero-width characters (U+200B, U+200C, U+200D, U+FEFF, U+2060) used to hide content in strings or identifiers
+- These are EXTREMELY suspicious in package source code — there is almost no legitimate reason for them
+
+**Multi-stage Loaders**
+- \`eval(response)\`, \`eval(data)\`, \`eval(body)\` — executing remotely fetched content
+- Writing content received from a network call to disk, then immediately \`exec()\`-ing or \`require()\`-ing it
+- This pattern fetches the actual malicious payload at runtime to evade static analysis
+
 ## Important Rules
 - Be precise. Only flag patterns you find in the actual code.
 - Quote EXACT code as evidence — include the file path and the specific malicious lines.
@@ -108,6 +124,16 @@ export function buildInvestigationKickoff(
   meta: PackageMetadata,
   source: PackageSource
 ): string {
+  const signals = meta.registrySignals;
+  const signalsBlock = signals
+    ? `\n**Registry Risk Score:** ${signals.riskScore}/10${signals.riskScore >= 5 ? ' \u26a0\ufe0f HIGH' : ''}
+**Maintainer change in latest release:** ${signals.maintainerChangedInLatestRelease ? `YES \u2014 replaced: ${signals.previousMaintainers.join(', ')} \u2192 ${signals.newMaintainers.join(', ')}` : 'no'}
+**Package age:** ${signals.packageAgeDays} days
+**Published days ago:** ${signals.publishedDaysAgo}
+**Typosquat candidate:** ${signals.typosquatCandidate ?? 'none'}${signals.typosquatCandidate ? ' \u26a0\ufe0f' : ''}
+**Dependency confusion risk:** ${signals.isDependencyConfusion ? 'YES \u26a0\ufe0f' : 'no'}
+**Has sigstore/Trusted Publisher provenance:** ${signals.hasProvenance ? 'yes' : 'NO'}` : '';
+
   return `Investigate this ${meta.ecosystem} package for supply chain threats:
 
 **Package:** ${meta.name}@${source.version}
@@ -119,7 +145,7 @@ export function buildInvestigationKickoff(
 **Maintainers:** ${meta.maintainers.join(', ') || '(unknown)'}
 **Repository:** ${meta.repositoryUrl ?? '(none)'}
 **Has install scripts:** ${meta.hasInstallScripts}
-**Total files:** ${source.fileList.length}
+**Total files:** ${source.fileList.length}${signalsBlock}
 
 Analyze the flagged file provided below. Use read_file or grep_package if you need additional context from the package.`;
 }
@@ -131,7 +157,8 @@ Analyze the flagged file provided below. Use read_file or grep_package if you ne
 export function buildFileAnalysisPrompt(
   meta: PackageMetadata,
   triage: TriageResult,
-  fileContent: string
+  fileContent: string,
+  source?: PackageSource
 ): string {
   const indicatorList = [...triage.indicators.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -139,7 +166,14 @@ export function buildFileAnalysisPrompt(
     .join(', ');
   const catList = [...triage.categories].join(', ');
 
-  return `Analyze this file from package "${meta.name}" for supply chain threats.
+  // Warn if this file is new in the current version vs. the previous one
+  const normalizedPath = triage.filePath.replace(/^package\//, '');
+  const isNewFile = source?.newFilesInVersion?.includes(normalizedPath);
+  const newFileWarning = isNewFile && source?.previousVersion
+    ? `\n\u26a0\ufe0f  NEW FILE: This file did NOT exist in the previous version (${source.previousVersion}). Newly added files are prime injection vectors \u2014 weight your analysis accordingly.\n`
+    : '';
+
+  return `Analyze this file from package "${meta.name}" for supply chain threats.${newFileWarning}
 
 **File:** ${triage.filePath}
 **Triage score:** ${triage.score}

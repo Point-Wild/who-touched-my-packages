@@ -26,7 +26,7 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   { name: 'metadata-endpoint', category: 'network', pattern: /169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com/gi, weight: 4 },
 
   // ── Credential Harvesting ─────────────────────────────────
-  { name: 'credential-files', category: 'creds', pattern: /\.ssh\/id_rsa|\.ssh\/id_ed25519|\.aws\/credentials|\.kube\/config|\.docker\/config\.json|\.npmrc|\.netrc|\.gnupg|\.pgpass/gi, weight: 4 },
+  { name: 'credential-files', category: 'creds', pattern: /\.ssh\/id_rsa|\.ssh\/id_ed25519|\.aws\/credentials|\.kube\/config|\.docker\/config\.json|\.npmrc|\.netrc|\.gnupg|\.pgpass|bash_history|zsh_history|\.config\/gcloud|\.azure\/credentials/gi, weight: 4 },
   { name: 'system-files', category: 'creds', pattern: /\/etc\/shadow|\/etc\/passwd|\/etc\/hosts/gi, weight: 4 },
   { name: 'homedir-read', category: 'creds', pattern: /homedir\(\).*readFile|os\.homedir\(\).*readFile|expanduser.*open|Path\.home\(\)/gi, weight: 3 },
 
@@ -38,7 +38,7 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   // ── Environment Scanning ──────────────────────────────────
   // Pattern-based: detect the BEHAVIOR of collecting/exfiltrating env vars
   { name: 'env-bulk-dump', category: 'env', pattern: /JSON\.stringify\([^)]*process\.env|JSON\.stringify\([^)]*os\.environ|JSON\.stringify\(\{[^}]*env:\s*process\.env/gi, weight: 4 },
-  { name: 'env-iterate-all', category: 'env', pattern: /Object\.(keys|entries|values)\(\s*process\.env\s*\)|Object\.fromEntries\([^)]*process\.env|for\s*\(\s*\w+\s+in\s+process\.env\)|os\.environ\.items\(\)|os\.environ\.copy\(\)/gi, weight: 3 },
+  { name: 'env-iterate-all', category: 'env', pattern: /Object\.(keys|entries|values)\(\s*process\.env\s*\)|Object\.fromEntries\([^)]*process\.env|for\s*\(\s*\w+\s+in\s+process\.env\)|os\.environ\.items\(\)|os\.environ\.copy\(\)|for\s+\w+\s+in\s+os\.environ/gi, weight: 3 },
   { name: 'env-filter-pattern', category: 'env', pattern: /process\.env\)\.filter\(|Object\.\w+\(process\.env\)\.filter/gi, weight: 4 },
   { name: 'env-regex-secrets', category: 'env', pattern: /\/(TOKEN|KEY|SECRET|PASS|CRED).*\/[gimsuy]*\.test\s*\(/gi, weight: 4 },
   { name: 'env-spread-into-payload', category: 'env', pattern: /\.\.\.\s*process\.env|env:\s*process\.env|env:\s*\{[^}]*\.\.\.process\.env|"env"\s*:\s*process\.env/gi, weight: 4 },
@@ -48,7 +48,8 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   { name: 'env-secrets-named', category: 'env', pattern: /AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN|GITHUB_TOKEN|NPM_TOKEN|ARTIFACTORY_CREDS|OPENAI_API_KEY|STRIPE_SECRET_KEY|SLACK_TOKEN|DATABASE_URL|VAULT_TOKEN/gi, weight: 1 },
 
   // ── Code Obfuscation / Dynamic Execution ──────────────────
-  { name: 'dynamic-exec', category: 'exec', pattern: /new\s+Function\s*\(|eval\s*\((?!uate)|exec\s*\([^)]*\.toString/gi, weight: 3 },
+  { name: 'dynamic-exec', category: 'exec', pattern: /new\s+Function\s*\(|eval\s*\((?!uate)|exec\s*\([^)]*(?:\.toString|base64|decode|atob|compile)/gi, weight: 3 },
+  { name: 'subprocess-launch', category: 'exec', pattern: /subprocess\.(?:Popen|run|call|check_output)\s*\(\s*\[.*?['"]\-c['"]|os\.(?:system|popen)\s*\(/gis, weight: 4 },
   { name: 'base64-decode-exec', category: 'exec', pattern: /Buffer\.from\([^)]+,\s*['"]base64['"]\)\s*\.toString|atob\s*\(|base64\.b64decode|base64\.decode/gi, weight: 3 },
   { name: 'marshal-pickle', category: 'exec', pattern: /marshal\.loads|pickle\.loads|yaml\.load\([^)]*Loader/gi, weight: 3 },
   { name: 'dynamic-import', category: 'exec', pattern: /__import__\s*\(|importlib\.import_module|require\s*\(\s*[^'"]/gi, weight: 2 },
@@ -58,16 +59,16 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
 
   // ── Build / Install Hooks ─────────────────────────────────
   { name: 'install-script', category: 'install', pattern: /["']?preinstall["']?\s*:|["']?postinstall["']?\s*:|["']?preuninstall["']?\s*:/gi, weight: 3 },
-  { name: 'build-injection', category: 'install', pattern: /BannerPlugin|DefinePlugin.*process\.env|webpack.*plugin.*raw|prepend.*main\.js|\.to\s*\(.*main\.js/gi, weight: 3 },
+  { name: 'build-injection', category: 'install', pattern: /BannerPlugin|DefinePlugin.*process\.env|webpack.*plugin.*raw|prepend.*main\.js|\.to\s*\(.*main\.js/gis, weight: 3 },
 
   // ── CI/CD Poisoning ───────────────────────────────────────
-  { name: 'ci-workflow-write', category: 'cicd', pattern: /writeFile.*\.github\/workflows|writeFile.*\.gitlab-ci|fs\.write.*workflow/gi, weight: 4 },
+  { name: 'ci-workflow-write', category: 'cicd', pattern: /writeFile.*\.github\/workflows|writeFile.*\.gitlab-ci|writeFile.*\.circleci|writeFile.*\.travis\.yml|writeFile.*azure-pipelines|fs\.write.*workflow/gi, weight: 4 },
   { name: 'ci-tool-exec', category: 'cicd', pattern: /terraform\s+(show|apply|plan)|kubectl\s+(apply|exec|create)|helm\s+(install|upgrade)/gi, weight: 2 },
   { name: 'proc-docker-access', category: 'cicd', pattern: /\/proc\/\d+\/mem|\/var\/run\/docker\.sock|docker\.sock/gi, weight: 4 },
 
   // ── Persistence ───────────────────────────────────────────
   { name: 'shell-profile', category: 'persist', pattern: /\.bashrc|\.zshrc|\.bash_profile|\.profile|\.zprofile/gi, weight: 4 },
-  { name: 'system-persist', category: 'persist', pattern: /crontab|launchctl\s+load|systemctl\s+enable|systemd.*service|\.pth/gi, weight: 4 },
+  { name: 'system-persist', category: 'persist', pattern: /crontab|launchctl\s+load|systemctl\s+enable|systemd.*service|\.pth|Library\/LaunchAgents|HKEY_(?:LOCAL_MACHINE|CURRENT_USER)|reg(?:\.exe)?\s+add/gi, weight: 4 },
 
   // ── Data Packaging ────────────────────────────────────────
   { name: 'archive-encrypt', category: 'data-pkg', pattern: /tar\s+[a-z]*c[a-z]*f|openssl\s+enc|gpg\s+--encrypt|zip\s+-[er]/gi, weight: 3 },
@@ -76,11 +77,40 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   // ── Monkey-patching / Hooking ─────────────────────────────
   { name: 'monkey-patch', category: 'hook', pattern: /module\.constructor\.prototype|Module\._resolveFilename|Module\._load|__proto__.*require/gi, weight: 4 },
   { name: 'prototype-pollute', category: 'hook', pattern: /Object\.prototype\[|__proto__\s*=/gi, weight: 3 },
-];
+  // ── Dormancy / Time-bomb ──────────────────────────────────────
+  { name: 'timebomb-date', category: 'timebomb',
+    // Matches literal future timestamps AND named constants assigned a 13-digit value near a Date.now() comparison
+    pattern: /new\s+Date\(\)\.getFullYear\(\)\s*[><=!]+\s*\d{4}|Date\.now\(\)\s*[><=!]+\s*(?:\d{13}|[A-Z_]{4,})|const\s+[A-Z_]{4,}\s*=\s*1[5-9]\d{11}/gi, weight: 3 },
+  { name: 'timebomb-delay', category: 'timebomb',
+    pattern: /setTimeout\s*\([^,]+,\s*\d{6,}\)|setInterval\s*\([^,]+,\s*\d{6,}\)/gi, weight: 3 },
+  { name: 'conditional-os', category: 'timebomb',
+    // Covers both process.platform and os.platform() (node-ipc style)
+    pattern: /(?:process\.platform|os\.platform\(\))\s*===?\s*['"](win32|linux|darwin)['"][\s\S]{0,300}exec|os\.name\s*==\s*['"](nt|posix)['"][\s\S]{0,300}subprocess/gis, weight: 3 },
+
+  // ── Trojan Source / Unicode Tricks (CVE-2021-42574) ──────────
+  { name: 'unicode-bidi', category: 'trojan-source',
+    pattern: /[\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200f\u061c]/g, weight: 4 },
+  { name: 'zero-width-chars', category: 'trojan-source',
+    pattern: /[\u200b\u200c\u200d\ufeff\u2060]/g, weight: 4 },
+
+  // ── Multi-stage Loader ────────────────────────────────────────
+  { name: 'eval-on-response', category: 'loader',
+    pattern: /eval\s*\(\s*(response|data|payload|result|body|text|res|chunk)\b/gi, weight: 4 },
+  { name: 'write-then-exec', category: 'loader',
+    pattern: /writeFile(?:Sync)?\s*\([^)]+\)[\s\S]{0,200}exec(?:Sync)?\s*\(|writeFile(?:Sync)?\s*\([^)]+\)[\s\S]{0,200}require\s*\(/gis, weight: 4 },
+  { name: 'multi-stage-fetch-exec', category: 'loader',
+    pattern: /(?:fetch|axios\.get|axios\.post|request)\s*\([^)]+\)[\s\S]{0,300}exec(?:Sync)?\s*\(/gis, weight: 4 },
+
+  // ── Package.json metadata URL injection ──────────────────────
+  { name: 'metadata-private-ip', category: 'network',
+    pattern: /"(?:bugs|funding|homepage)"[^}]{0,100}(?:192\.168\.|10\.\d+\.|172\.(?:1[6-9]|2\d|3[01])\.|127\.0\.0\.1|0\.0\.0\.0)/gi, weight: 4 },];
 
 /**
  * File path patterns that are LOW-VALUE for security analysis.
  * Matches reduce a file's score to suppress noise from tests, docs, etc.
+ * NOTE: .min.js is intentionally excluded here; it is handled separately in
+ * runTriage() with score-sensitive logic (high-scoring minified files are
+ * boosted, not suppressed).
  */
 const LOW_VALUE_PATH_PATTERNS = [
   /\/__tests__\//i,
@@ -96,7 +126,6 @@ const LOW_VALUE_PATH_PATTERNS = [
   /\/docs?\//i,
   /\/examples?\//i,
   /\.md$/i,
-  /\.min\.js$/i,
   /\.map$/i,
   /LICENSE/i,
   /\.ya?ml$/i,
@@ -210,6 +239,16 @@ export function runTriage(allContent: Map<string, string>): TriageResult[] {
     }
     if (filePath.startsWith('package.json:')) {
       entry.score = Math.round(entry.score * 3);
+    }
+    // Minified files: suppress low-scoring matches (noise) but boost high-scoring
+    // ones — legitimate minified files don't contain eval, base64 blobs, or socket
+    // calls, so a high score in a .min.js is genuinely suspicious.
+    if (/\.min\.js$/i.test(filePath)) {
+      if (entry.score < 6) {
+        entry.score = Math.round(entry.score * 0.3);
+      } else {
+        entry.score = Math.round(entry.score * 1.2);
+      }
     }
   }
 
@@ -384,18 +423,19 @@ export function createPackageTools(source: PackageSource, allContent?: Map<strin
       description: 'Submit findings for this package. Call this incrementally as you discover threats — results accumulate across calls. Call with an empty array when done investigating.',
       schema: z.object({
         findings: z.array(z.object({
-          category: z.enum([
-            'network-exfiltration',
-            'credential-harvesting',
-            'crypto-wallet-theft',
-            'environment-scanning',
-            'code-obfuscation',
-            'persistence',
-            'data-packaging',
-            'cicd-poisoning',
-          ]),
-          severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
-          confidence: z.number().min(0).max(1),
+          // Accept any string the LLM produces; unknown categories are preserved
+          // as-is so findings are never silently dropped due to schema mismatches.
+          category: z.string().transform(v => {
+            const known = [
+              'network-exfiltration', 'credential-harvesting', 'crypto-wallet-theft',
+              'environment-scanning', 'code-obfuscation', 'persistence',
+              'data-packaging', 'cicd-poisoning', 'maintainer-takeover',
+              'typosquatting', 'dependency-confusion',
+            ];
+            return known.includes(v) ? v : 'code-obfuscation';
+          }),
+          severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).catch('MEDIUM'),
+          confidence: z.number().min(0).max(1).catch(0.5),
           title: z.string(),
           description: z.string(),
           evidence: z.string(),
