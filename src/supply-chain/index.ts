@@ -1,13 +1,12 @@
 import type { Dependency } from '../scanner/types.js';
 import { buildAnalysisGraph } from './graph.js';
 import { createChatModel } from './llm/client.js';
+import { DEFAULT_MODEL, DEFAULT_CONCURRENCY, resolveModel } from './llm/models.js';
 import type { SupplyChainOptions, SupplyChainReport } from './types.js';
 import { resolveApiKey } from './utils.js';
 
 export type { SupplyChainFinding, SupplyChainOptions, SupplyChainReport, ThreatCategory } from './types.js';
-
-const DEFAULT_MODEL = 'claude-sonnet-4-5-20241022';
-const DEFAULT_CONCURRENCY = 3;
+export { DEFAULT_MODEL, DEFAULT_CONCURRENCY } from './llm/models.js';
 
 /**
  * Analyze dependencies for supply chain poisoning threats.
@@ -37,12 +36,12 @@ export async function analyzeSupplyChain(
         byCategory: {},
       },
       timestamp: new Date().toISOString(),
-      model: options.model ?? DEFAULT_MODEL,
+      model: resolveModel(options.model, options.provider),
     };
   }
 
-  const apiKey = resolveApiKey(options.apiKey, options.provider);
-  const model = options.model ?? DEFAULT_MODEL;
+  const model = resolveModel(options.model, options.provider);
+  const apiKey = resolveApiKey(options.apiKey, options.provider, model);
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
 
   const chatModel = createChatModel({ apiKey, model, provider: options.provider });
