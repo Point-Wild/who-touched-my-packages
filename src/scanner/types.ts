@@ -13,6 +13,7 @@ export interface Dependency {
   isDev?: boolean;
   depth?: number;
   paths?: string[][];
+  provenance?: boolean;
 }
 
 export interface DependencyEdge {

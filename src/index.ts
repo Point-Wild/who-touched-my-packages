@@ -7,6 +7,7 @@ import ora from 'ora';
 
 import * as Package from "../package.json" assert { type: "json" };
 import { GitHubDataSource, OSVDataSource } from './auditor/datasources/index.js';
+import { applyVerificationResults, verifyPackages } from './auditor/package-verifier.js';
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
 import { parseDependencies } from './scanner/dependency-parser.js';
 import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency-tree-resolver.js';
@@ -212,6 +213,25 @@ async function main() {
     // When supply chain scanning at depth > 1, filter to the requested depth
     if (options.supplyChain && supplyChainDepth > 1) {
       allDependencies = allDependencies.filter(d => (d.depth ?? 0) < supplyChainDepth);
+    }
+  }
+
+  // Verify package provenance (after tree building so allDependencies gets the data)
+  if (spinner) {
+    spinner.text = 'Verifying package provenance...';
+  }
+
+  try {
+    const verificationResults = await verifyPackages(allDependencies);
+    applyVerificationResults(allDependencies, verificationResults);
+    // Also apply to the original dependencies list for terminal output
+    if (allDependencies !== dependencies) {
+      applyVerificationResults(dependencies, verificationResults);
+    }
+  } catch (error) {
+    // Continue without provenance data if verification fails
+    if (options.verbose) {
+      console.log(theme.dim('Warning: Package provenance verification failed'));
     }
   }
   

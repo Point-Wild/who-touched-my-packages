@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
 import type { Dependency, DependencyEdge, DependencyFile } from '../scanner/types.js';
-import { formatFileList, formatSummary, formatVulnerability } from './formatters.js';
+import { formatFileList, formatProvenanceSummary, formatSummary, formatVulnerability } from './formatters.js';
 import type { ReportData } from './html-report/types.js';
 import { theme } from './theme.js';
 
@@ -50,6 +50,14 @@ export class Reporter {
     }
     
     console.log(formatSummary(result));
+    
+    // Show provenance summary if dependencies are available
+    if (dependencies && dependencies.length > 0) {
+      const verifiedPackages = dependencies.filter(d => d.provenance !== undefined);
+      if (verifiedPackages.length > 0) {
+        console.log(formatProvenanceSummary(dependencies));
+      }
+    }
     
     if (result.vulnerabilities.length === 0) {
       this.showFinalSummary(result, files, dependencies);

@@ -1,5 +1,5 @@
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
-import type { DependencyFile } from '../scanner/types.js';
+import type { Dependency, DependencyFile } from '../scanner/types.js';
 import { getSeverityColor, icons, theme } from './theme.js';
 
 export function formatVulnerability(vuln: Vulnerability): string {
@@ -120,4 +120,53 @@ function getSeverityIcon(severity: string): string {
 
 export function formatProgress(message: string): string {
   return theme.info(`${icons.search} ${message}`);
+}
+
+export function formatProvenanceSummary(dependencies: Dependency[]): string {
+  const packagesWithoutProvenance = dependencies.filter(
+    d => d.provenance === false
+  );
+  
+  const packagesWithProvenance = dependencies.filter(
+    d => d.provenance === true
+  );
+  
+  const unknownProvenance = dependencies.filter(
+    d => d.provenance === undefined
+  );
+  
+  let output = '\n';
+  output += theme.bold('═'.repeat(60)) + '\n';
+  output += theme.bold(`${icons.shield} Provenance Verification\n`);
+  output += theme.bold('═'.repeat(60)) + '\n\n';
+  
+  if (packagesWithProvenance.length > 0) {
+    output += theme.success(`${icons.success} ${packagesWithProvenance.length} packages with provenance\n`);
+  }
+  
+  if (packagesWithoutProvenance.length > 0) {
+    output += theme.high(`${icons.warning} ${packagesWithoutProvenance.length} packages without provenance\n`);
+    
+    // Show the first few packages without provenance
+    const displayCount = Math.min(packagesWithoutProvenance.length, 5);
+    const extraCount = packagesWithoutProvenance.length - displayCount;
+    
+    output += theme.dim('\nPackages without provenance:\n');
+    for (let i = 0; i < displayCount; i++) {
+      const pkg = packagesWithoutProvenance[i];
+      output += theme.dim(`  • ${pkg.name}@${pkg.version}\n`);
+    }
+    
+    if (extraCount > 0) {
+      output += theme.dim(`  ... and ${extraCount} more\n`);
+    }
+  }
+  
+  if (unknownProvenance.length > 0) {
+    output += theme.dim(`\n${icons.info} ${unknownProvenance.length} packages with unknown provenance status\n`);
+  }
+  
+  output += '\n' + theme.bold('═'.repeat(60));
+  
+  return output;
 }

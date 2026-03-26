@@ -9,6 +9,7 @@ interface DependenciesTabProps {
 export function DependenciesTab({ data }: DependenciesTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showVulnerableOnly, setShowVulnerableOnly] = useState(false);
+  const [showNoProvenanceOnly, setShowNoProvenanceOnly] = useState(false);
 
   const vulnerablePackages = useMemo(() => {
     return new Set(data.auditResult.vulnerabilities.map(v => v.packageName));
@@ -36,8 +37,9 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
         dep.version.includes(searchTerm);
 
       const matchesVulnFilter = !showVulnerableOnly || vulnerablePackages.has(dep.name);
+      const matchesProvenanceFilter = !showNoProvenanceOnly || dep.provenance === false;
 
-      return matchesSearch && matchesVulnFilter;
+      return matchesSearch && matchesVulnFilter && matchesProvenanceFilter;
     });
 
     return filtered.sort((a, b) => {
@@ -59,13 +61,14 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
 
       return a.name.localeCompare(b.name);
     });
-  }, [data.dependencies, searchTerm, showVulnerableOnly, vulnerablePackages, vulnerabilitySeverityMap]);
+  }, [data.dependencies, searchTerm, showVulnerableOnly, showNoProvenanceOnly, vulnerablePackages, vulnerabilitySeverityMap]);
 
   const depsForExport = useMemo(() => {
     return filteredDeps.map(dep => ({
       ...dep,
       isVulnerable: vulnerablePackages.has(dep.name),
       maxSeverity: vulnerabilitySeverityMap.get(dep.name) || 'N/A',
+      provenanceStatus: dep.provenance === true ? 'Verified' : dep.provenance === false ? 'Missing' : 'Unknown',
     }));
   }, [filteredDeps, vulnerablePackages, vulnerabilitySeverityMap]);
 
@@ -77,6 +80,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
     { key: 'isDev' as const, label: 'Type' },
     { key: 'isVulnerable' as const, label: 'Vulnerable' },
     { key: 'maxSeverity' as const, label: 'Max Severity' },
+    { key: 'provenanceStatus' as const, label: 'Provenance' },
   ];
 
   if (data.dependencies.length === 0) {
@@ -122,6 +126,19 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
           />
           Vulnerable only
         </label>
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          fontSize: '13px', color: 'var(--text-secondary)',
+          cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
+        }}>
+          <input
+            type="checkbox"
+            checked={showNoProvenanceOnly}
+            onChange={e => setShowNoProvenanceOnly(e.target.checked)}
+            style={{ accentColor: 'var(--accent-rose)', width: '14px', height: '14px', cursor: 'pointer' }}
+          />
+          No provenance only
+        </label>
         <ExportButton
           data={depsForExport}
           filename="dependencies"
@@ -140,6 +157,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
                 <th>Ecosystem</th>
                 <th>File Path</th>
                 <th>Type</th>
+                <th>Provenance</th>
                 <th>Links</th>
               </tr>
             </thead>
@@ -167,6 +185,15 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
                       </a>
                     </td>
                     <td>{dep.isDev ? 'Dev' : 'Production'}</td>
+                    <td>
+                      {dep.provenance === true ? (
+                        <span style={{ color: 'var(--low)' }}>✓ Verified</span>
+                      ) : dep.provenance === false ? (
+                        <span style={{ color: 'var(--high)', fontWeight: 600 }}>⚠️ Missing</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)' }}>Unknown</span>
+                      )}
+                    </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         {dep.ecosystem === 'npm' ? (
