@@ -6,7 +6,7 @@ import open from 'open';
 import ora from 'ora';
 
 import * as Package from "../package.json" assert { type: "json" };
-import { GitHubDataSource, OSVDataSource } from './auditor/datasources/index.js';
+import { OSVDataSource } from './auditor/datasources/index.js';
 import { applyVerificationResults, verifyPackages } from './auditor/package-verifier.js';
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
 import { parseDependencies } from './scanner/dependency-parser.js';
@@ -244,7 +244,6 @@ async function main() {
   
   const dataSources = [
     new OSVDataSource(),
-    new GitHubDataSource(),
   ];
   
   const checker = new VulnerabilityChecker(dataSources);
