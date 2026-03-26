@@ -7,6 +7,7 @@ export interface Vulnerability {
   description?: string;
   references: string[];
   cvss?: number;
+  source: string;
 }
 
 export interface AuditSummary {

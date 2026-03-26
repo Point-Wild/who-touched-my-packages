@@ -35,6 +35,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
   const csvHeaders = [
     { key: 'severity' as const, label: 'Severity' },
     { key: 'id' as const, label: 'ID' },
+    { key: 'source' as const, label: 'Source' },
     { key: 'packageName' as const, label: 'Package' },
     { key: 'packageVersion' as const, label: 'Version' },
     { key: 'title' as const, label: 'Title' },
@@ -106,6 +107,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
               <tr>
                 <th>Severity</th>
                 <th>ID</th>
+                <th>Source</th>
                 <th>Package</th>
                 <th>Version</th>
                 <th>Title & References</th>
@@ -123,6 +125,9 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                   </td>
                   <td>
                     <code style={{ fontSize: '0.875rem' }}>{vuln.id}</code>
+                  </td>
+                  <td>
+                    <span className="source-badge">{vuln.source}</span>
                   </td>
                   <td>
                     <strong>{vuln.packageName}</strong>
