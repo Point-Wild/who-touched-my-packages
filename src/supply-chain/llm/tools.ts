@@ -26,7 +26,7 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   { name: 'metadata-endpoint', category: 'network', pattern: /169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com/gi, weight: 4 },
 
   // ── Credential Harvesting ─────────────────────────────────
-  { name: 'credential-files', category: 'creds', pattern: /\.ssh\/id_rsa|\.ssh\/id_ed25519|\.aws\/credentials|\.kube\/config|\.docker\/config\.json|\.npmrc|\.netrc|\.gnupg|\.pgpass/gi, weight: 4 },
+  { name: 'credential-files', category: 'creds', pattern: /\.ssh\/id_rsa|\.ssh\/id_ed25519|\.aws\/credentials|\.kube\/config|\.docker\/config\.json|\.npmrc|\.netrc|\.gnupg|\.pgpass|bash_history|zsh_history|\.config\/gcloud|\.azure\/credentials/gi, weight: 4 },
   { name: 'system-files', category: 'creds', pattern: /\/etc\/shadow|\/etc\/passwd|\/etc\/hosts/gi, weight: 4 },
   { name: 'homedir-read', category: 'creds', pattern: /homedir\(\).*readFile|os\.homedir\(\).*readFile|expanduser.*open|Path\.home\(\)/gi, weight: 3 },
 
@@ -38,7 +38,7 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   // ── Environment Scanning ──────────────────────────────────
   // Pattern-based: detect the BEHAVIOR of collecting/exfiltrating env vars
   { name: 'env-bulk-dump', category: 'env', pattern: /JSON\.stringify\([^)]*process\.env|JSON\.stringify\([^)]*os\.environ|JSON\.stringify\(\{[^}]*env:\s*process\.env/gi, weight: 4 },
-  { name: 'env-iterate-all', category: 'env', pattern: /Object\.(keys|entries|values)\(\s*process\.env\s*\)|Object\.fromEntries\([^)]*process\.env|for\s*\(\s*\w+\s+in\s+process\.env\)|os\.environ\.items\(\)|os\.environ\.copy\(\)/gi, weight: 3 },
+  { name: 'env-iterate-all', category: 'env', pattern: /Object\.(keys|entries|values)\(\s*process\.env\s*\)|Object\.fromEntries\([^)]*process\.env|for\s*\(\s*\w+\s+in\s+process\.env\)|os\.environ\.items\(\)|os\.environ\.copy\(\)|for\s+\w+\s+in\s+os\.environ/gi, weight: 3 },
   { name: 'env-filter-pattern', category: 'env', pattern: /process\.env\)\.filter\(|Object\.\w+\(process\.env\)\.filter/gi, weight: 4 },
   { name: 'env-regex-secrets', category: 'env', pattern: /\/(TOKEN|KEY|SECRET|PASS|CRED).*\/[gimsuy]*\.test\s*\(/gi, weight: 4 },
   { name: 'env-spread-into-payload', category: 'env', pattern: /\.\.\.\s*process\.env|env:\s*process\.env|env:\s*\{[^}]*\.\.\.process\.env|"env"\s*:\s*process\.env/gi, weight: 4 },
@@ -59,16 +59,16 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
 
   // ── Build / Install Hooks ─────────────────────────────────
   { name: 'install-script', category: 'install', pattern: /["']?preinstall["']?\s*:|["']?postinstall["']?\s*:|["']?preuninstall["']?\s*:/gi, weight: 3 },
-  { name: 'build-injection', category: 'install', pattern: /BannerPlugin|DefinePlugin.*process\.env|webpack.*plugin.*raw|prepend.*main\.js|\.to\s*\(.*main\.js/gi, weight: 3 },
+  { name: 'build-injection', category: 'install', pattern: /BannerPlugin|DefinePlugin.*process\.env|webpack.*plugin.*raw|prepend.*main\.js|\.to\s*\(.*main\.js/gis, weight: 3 },
 
   // ── CI/CD Poisoning ───────────────────────────────────────
-  { name: 'ci-workflow-write', category: 'cicd', pattern: /writeFile.*\.github\/workflows|writeFile.*\.gitlab-ci|fs\.write.*workflow/gi, weight: 4 },
+  { name: 'ci-workflow-write', category: 'cicd', pattern: /writeFile.*\.github\/workflows|writeFile.*\.gitlab-ci|writeFile.*\.circleci|writeFile.*\.travis\.yml|writeFile.*azure-pipelines|fs\.write.*workflow/gi, weight: 4 },
   { name: 'ci-tool-exec', category: 'cicd', pattern: /terraform\s+(show|apply|plan)|kubectl\s+(apply|exec|create)|helm\s+(install|upgrade)/gi, weight: 2 },
   { name: 'proc-docker-access', category: 'cicd', pattern: /\/proc\/\d+\/mem|\/var\/run\/docker\.sock|docker\.sock/gi, weight: 4 },
 
   // ── Persistence ───────────────────────────────────────────
   { name: 'shell-profile', category: 'persist', pattern: /\.bashrc|\.zshrc|\.bash_profile|\.profile|\.zprofile/gi, weight: 4 },
-  { name: 'system-persist', category: 'persist', pattern: /crontab|launchctl\s+load|systemctl\s+enable|systemd.*service|\.pth/gi, weight: 4 },
+  { name: 'system-persist', category: 'persist', pattern: /crontab|launchctl\s+load|systemctl\s+enable|systemd.*service|\.pth|Library\/LaunchAgents|HKEY_(?:LOCAL_MACHINE|CURRENT_USER)|reg(?:\.exe)?\s+add/gi, weight: 4 },
 
   // ── Data Packaging ────────────────────────────────────────
   { name: 'archive-encrypt', category: 'data-pkg', pattern: /tar\s+[a-z]*c[a-z]*f|openssl\s+enc|gpg\s+--encrypt|zip\s+-[er]/gi, weight: 3 },
@@ -85,7 +85,7 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
     pattern: /setTimeout\s*\([^,]+,\s*\d{6,}\)|setInterval\s*\([^,]+,\s*\d{6,}\)/gi, weight: 3 },
   { name: 'conditional-os', category: 'timebomb',
     // Covers both process.platform and os.platform() (node-ipc style)
-    pattern: /(?:process\.platform|os\.platform\(\))\s*===?\s*['"](?:win32|linux|darwin)['"][\s\S]{0,300}exec|os\.name\s*==\s*['"](?:nt|posix)['"][\s\S]{0,300}subprocess/gis, weight: 2 },
+    pattern: /(?:process\.platform|os\.platform\(\))\s*===?\s*['"](win32|linux|darwin)['"][\s\S]{0,300}exec|os\.name\s*==\s*['"](nt|posix)['"][\s\S]{0,300}subprocess/gis, weight: 3 },
 
   // ── Trojan Source / Unicode Tricks (CVE-2021-42574) ──────────
   { name: 'unicode-bidi', category: 'trojan-source',
