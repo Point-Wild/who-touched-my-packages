@@ -41,30 +41,30 @@ export default defineConfig({
                         { label: 'Quick Start', link: '/quick-start/' },
                     ],
                 },
-                {
-                    label: 'Usage',
-                    items: [
-                        { label: 'Command Line Options', link: '/usage/cli-options/' },
-                        { label: 'Scanning Projects', link: '/usage/scanning/' },
-                        { label: 'CI/CD Integration', link: '/usage/ci-cd/' },
-                    ],
-                },
-                {
-                    label: 'Data Sources',
-                    items: [
-                        { label: 'Overview', link: '/data-sources/overview/' },
-                        { label: 'OSV', link: '/data-sources/osv/' },
-                        { label: 'GitHub Advisory', link: '/data-sources/github/' },
-                    ],
-                },
-                {
-                    label: 'Guides',
-                    items: [
-                        { label: 'Understanding Output', link: '/guides/output/' },
-                        { label: 'Filtering Results', link: '/guides/filtering/' },
-                        { label: 'JSON Output', link: '/guides/json/' },
-                    ],
-                },
+                // {
+                //     label: 'Usage',
+                //     items: [
+                //         { label: 'Command Line Options', link: '/usage/cli-options/' },
+                //         { label: 'Scanning Projects', link: '/usage/scanning/' },
+                //         { label: 'CI/CD Integration', link: '/usage/ci-cd/' },
+                //     ],
+                // },
+                // {
+                //     label: 'Data Sources',
+                //     items: [
+                //         { label: 'Overview', link: '/data-sources/overview/' },
+                //         { label: 'OSV', link: '/data-sources/osv/' },
+                //         { label: 'GitHub Advisory', link: '/data-sources/github/' },
+                //     ],
+                // },
+                // {
+                //     label: 'Guides',
+                //     items: [
+                //         { label: 'Understanding Output', link: '/guides/output/' },
+                //         { label: 'Filtering Results', link: '/guides/filtering/' },
+                //         { label: 'JSON Output', link: '/guides/json/' },
+                //     ],
+                // },
             ],
             customCss: [
                 './src/styles/custom.css',
