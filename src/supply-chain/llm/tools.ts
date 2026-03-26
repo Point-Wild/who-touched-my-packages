@@ -76,11 +76,40 @@ const THREAT_INDICATORS: Array<{ name: string; pattern: RegExp; weight: number; 
   // ── Monkey-patching / Hooking ─────────────────────────────
   { name: 'monkey-patch', category: 'hook', pattern: /module\.constructor\.prototype|Module\._resolveFilename|Module\._load|__proto__.*require/gi, weight: 4 },
   { name: 'prototype-pollute', category: 'hook', pattern: /Object\.prototype\[|__proto__\s*=/gi, weight: 3 },
-];
+  // ── Dormancy / Time-bomb ──────────────────────────────────────
+  { name: 'timebomb-date', category: 'timebomb',
+    // Matches literal future timestamps AND named constants assigned a 13-digit value near a Date.now() comparison
+    pattern: /new\s+Date\(\)\.getFullYear\(\)\s*[><=!]+\s*\d{4}|Date\.now\(\)\s*[><=!]+\s*(?:\d{13}|[A-Z_]{4,})|const\s+[A-Z_]{4,}\s*=\s*1[5-9]\d{11}/gi, weight: 3 },
+  { name: 'timebomb-delay', category: 'timebomb',
+    pattern: /setTimeout\s*\([^,]+,\s*\d{6,}\)|setInterval\s*\([^,]+,\s*\d{6,}\)/gi, weight: 3 },
+  { name: 'conditional-os', category: 'timebomb',
+    // Covers both process.platform and os.platform() (node-ipc style)
+    pattern: /(?:process\.platform|os\.platform\(\))\s*===?\s*['"](?:win32|linux|darwin)['"][\s\S]{0,300}exec|os\.name\s*==\s*['"](?:nt|posix)['"][\s\S]{0,300}subprocess/gis, weight: 2 },
+
+  // ── Trojan Source / Unicode Tricks (CVE-2021-42574) ──────────
+  { name: 'unicode-bidi', category: 'trojan-source',
+    pattern: /[\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200f\u061c]/g, weight: 4 },
+  { name: 'zero-width-chars', category: 'trojan-source',
+    pattern: /[\u200b\u200c\u200d\ufeff\u2060]/g, weight: 4 },
+
+  // ── Multi-stage Loader ────────────────────────────────────────
+  { name: 'eval-on-response', category: 'loader',
+    pattern: /eval\s*\(\s*(response|data|payload|result|body|text|res|chunk)\b/gi, weight: 4 },
+  { name: 'write-then-exec', category: 'loader',
+    pattern: /writeFile(?:Sync)?\s*\([^)]+\)[\s\S]{0,200}exec(?:Sync)?\s*\(|writeFile(?:Sync)?\s*\([^)]+\)[\s\S]{0,200}require\s*\(/gis, weight: 4 },
+  { name: 'multi-stage-fetch-exec', category: 'loader',
+    pattern: /(?:fetch|axios\.get|axios\.post|request)\s*\([^)]+\)[\s\S]{0,300}exec(?:Sync)?\s*\(/gis, weight: 4 },
+
+  // ── Package.json metadata URL injection ──────────────────────
+  { name: 'metadata-private-ip', category: 'network',
+    pattern: /"(?:bugs|funding|homepage)"[^}]{0,100}(?:192\.168\.|10\.\d+\.|172\.(?:1[6-9]|2\d|3[01])\.|127\.0\.0\.1|0\.0\.0\.0)/gi, weight: 4 },];
 
 /**
  * File path patterns that are LOW-VALUE for security analysis.
  * Matches reduce a file's score to suppress noise from tests, docs, etc.
+ * NOTE: .min.js is intentionally excluded here; it is handled separately in
+ * runTriage() with score-sensitive logic (high-scoring minified files are
+ * boosted, not suppressed).
  */
 const LOW_VALUE_PATH_PATTERNS = [
   /\/__tests__\//i,
@@ -96,7 +125,6 @@ const LOW_VALUE_PATH_PATTERNS = [
   /\/docs?\//i,
   /\/examples?\//i,
   /\.md$/i,
-  /\.min\.js$/i,
   /\.map$/i,
   /LICENSE/i,
   /\.ya?ml$/i,
@@ -210,6 +238,16 @@ export function runTriage(allContent: Map<string, string>): TriageResult[] {
     }
     if (filePath.startsWith('package.json:')) {
       entry.score = Math.round(entry.score * 3);
+    }
+    // Minified files: suppress low-scoring matches (noise) but boost high-scoring
+    // ones — legitimate minified files don't contain eval, base64 blobs, or socket
+    // calls, so a high score in a .min.js is genuinely suspicious.
+    if (/\.min\.js$/i.test(filePath)) {
+      if (entry.score < 6) {
+        entry.score = Math.round(entry.score * 0.3);
+      } else {
+        entry.score = Math.round(entry.score * 1.2);
+      }
     }
   }
 
@@ -384,18 +422,19 @@ export function createPackageTools(source: PackageSource, allContent?: Map<strin
       description: 'Submit findings for this package. Call this incrementally as you discover threats — results accumulate across calls. Call with an empty array when done investigating.',
       schema: z.object({
         findings: z.array(z.object({
-          category: z.enum([
-            'network-exfiltration',
-            'credential-harvesting',
-            'crypto-wallet-theft',
-            'environment-scanning',
-            'code-obfuscation',
-            'persistence',
-            'data-packaging',
-            'cicd-poisoning',
-          ]),
-          severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
-          confidence: z.number().min(0).max(1),
+          // Accept any string the LLM produces; unknown categories are preserved
+          // as-is so findings are never silently dropped due to schema mismatches.
+          category: z.string().transform(v => {
+            const known = [
+              'network-exfiltration', 'credential-harvesting', 'crypto-wallet-theft',
+              'environment-scanning', 'code-obfuscation', 'persistence',
+              'data-packaging', 'cicd-poisoning', 'maintainer-takeover',
+              'typosquatting', 'dependency-confusion',
+            ];
+            return known.includes(v) ? v : 'code-obfuscation';
+          }),
+          severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).catch('MEDIUM'),
+          confidence: z.number().min(0).max(1).catch(0.5),
           title: z.string(),
           description: z.string(),
           evidence: z.string(),

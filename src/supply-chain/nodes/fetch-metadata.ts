@@ -6,10 +6,18 @@ import { pMap, depKey } from '../utils.js';
 
 /**
  * Fetch registry metadata and download source tarballs for all dependencies.
+ *
+ * @param dependencies - Flat list of dependencies to analyse
+ * @param concurrency  - Number of concurrent fetches
+ * @param maxPackages  - Hard cap on packages (0 = unlimited). Applied after
+ *                       deduplication; packages with install scripts are
+ *                       prioritised when truncating.
+ * @param onProgress   - Optional progress callback
  */
 export async function fetchMetadataNode(
   dependencies: Dependency[],
   concurrency: number = 6,
+  maxPackages: number = 0,
   onProgress?: (done: number, total: number) => void
 ): Promise<{
   metadata: Map<string, PackageMetadata>;
@@ -25,7 +33,13 @@ export async function fetchMetadataNode(
     if (!unique.has(key)) unique.set(key, dep);
   }
 
-  const deps = Array.from(unique.values());
+  let deps = Array.from(unique.values());
+
+  // Apply package cap if requested
+  if (maxPackages > 0 && deps.length > maxPackages) {
+    deps = deps.slice(0, maxPackages);
+  }
+
   let done = 0;
 
   await pMap(
@@ -34,18 +48,22 @@ export async function fetchMetadataNode(
       const key = depKey(dep.ecosystem, dep.name);
 
       try {
-        // Fetch metadata and source in parallel
-        const [meta, source] = await Promise.all([
-          dep.ecosystem === 'npm'
-            ? fetchNpmMetadata(dep.name)
-            : fetchPypiMetadata(dep.name),
-          dep.ecosystem === 'npm'
-            ? fetchNpmSource(dep.name, dep.version)
-            : fetchPypiSource(dep.name, dep.version),
-        ]);
+        // Fetch metadata first so we can pass the previous-version hint to the
+        // source fetcher (needed for version-diff computation in npm).
+        const meta = dep.ecosystem === 'npm'
+          ? await fetchNpmMetadata(dep.name)
+          : await fetchPypiMetadata(dep.name);
 
-        if (meta) metadata.set(key, meta);
-        if (source) sources.set(key, source);
+        if (meta) {
+          metadata.set(key, meta);
+
+          // For npm, pass the previous version so fetchNpmSource can diff tarballs.
+          const source = dep.ecosystem === 'npm'
+            ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
+            : await fetchPypiSource(dep.name, dep.version);
+
+          if (source) sources.set(key, source);
+        }
       } catch {
         // Skip packages that fail to fetch — don't block the scan
       }

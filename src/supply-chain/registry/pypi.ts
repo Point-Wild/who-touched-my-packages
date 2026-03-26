@@ -1,5 +1,10 @@
-import type { PackageMetadata, PackageSource } from '../types.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { downloadAndExtractTarGz } from './tarball.js';
+import {
+  computeTyposquatCandidate,
+  isDependencyConfusion,
+  computeRegistryRiskScore,
+} from './signals.js';
 
 const PYPI_BASE = 'https://pypi.org/pypi';
 const STATS_BASE = 'https://pypistats.org/api/packages';
@@ -45,6 +50,37 @@ export async function fetchPypiMetadata(packageName: string): Promise<PackageMet
     (releases[v] ?? []).some((f: any) => f.filename?.endsWith('.tar.gz'))
   );
 
+  // Registry risk signals
+  const now = Date.now();
+  const packageAgeDays = createdAt
+    ? Math.floor((now - new Date(createdAt).getTime()) / 86_400_000) : 0;
+  const publishedDaysAgo = updatedAt
+    ? Math.floor((now - new Date(updatedAt).getTime()) / 86_400_000) : 0;
+
+  // PyPI Trusted Publisher provenance: check if any release file has
+  // metadata_version >= 2.3 (the version that added provenance support)
+  const latestFiles: any[] = releases[info.version ?? ''] ?? [];
+  const hasProvenance = latestFiles.some(
+    (f: any) => f.provenance_url != null || f.metadata_version >= '2.3'
+  );
+
+  const signalsWithoutScore: Omit<RegistrySignals, 'riskScore'> = {
+    // PyPI API doesn't expose per-release maintainer history reliably
+    maintainerChangedInLatestRelease: false,
+    previousMaintainers: [],
+    newMaintainers: [],
+    packageAgeDays,
+    publishedDaysAgo,
+    typosquatCandidate: computeTyposquatCandidate(packageName, 'pypi'),
+    isDependencyConfusion: isDependencyConfusion(packageName),
+    hasProvenance,
+  };
+
+  const registrySignals: RegistrySignals = {
+    ...signalsWithoutScore,
+    riskScore: computeRegistryRiskScore(signalsWithoutScore),
+  };
+
   return {
     name: packageName,
     ecosystem: 'pypi',
@@ -58,6 +94,7 @@ export async function fetchPypiMetadata(packageName: string): Promise<PackageMet
     repositoryUrl: info.project_urls?.Source ?? info.project_urls?.Repository ?? info.home_page ?? undefined,
     description: info.summary ?? undefined,
     license: info.license ?? undefined,
+    registrySignals,
   };
 }
 

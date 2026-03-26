@@ -1,23 +1,38 @@
-import type { PackageMetadata, PackageSource } from '../types.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { downloadAndExtractTarGz } from './tarball.js';
+import {
+  computeTyposquatCandidate,
+  isDependencyConfusion,
+  computeRegistryRiskScore,
+} from './signals.js';
 
 const REGISTRY_BASE = 'https://registry.npmjs.org';
 const DOWNLOADS_BASE = 'https://api.npmjs.org/downloads/point/last-week';
 
+/**
+ * Fetch the full package registry document and return the previous version string
+ * (one before latest) alongside the full metadata. Exposed so fetchNpmSource can
+ * reuse it without a second network call.
+ */
+export async function fetchNpmPackageDoc(packageName: string): Promise<any | null> {
+  const encoded = encodeURIComponent(packageName);
+  const res = await fetch(`${REGISTRY_BASE}/${encoded}`);
+  return res.ok ? (res.json() as Promise<any>) : null;
+}
+
 export async function fetchNpmMetadata(packageName: string): Promise<PackageMetadata | null> {
   const encoded = encodeURIComponent(packageName);
 
-  const [metaRes, dlRes] = await Promise.all([
-    fetch(`${REGISTRY_BASE}/${encoded}`),
+  const [meta, dlRes] = await Promise.all([
+    fetchNpmPackageDoc(packageName),
     fetch(`${DOWNLOADS_BASE}/${encoded}`).catch(() => null),
   ]);
 
-  if (!metaRes.ok) return null;
+  if (!meta) return null;
 
-  const meta = await metaRes.json() as any;
-  const latestVersion = meta['dist-tags']?.latest ?? '';
+  const latestVersion: string = meta['dist-tags']?.latest ?? '';
   const latestMeta = meta.versions?.[latestVersion] ?? {};
-  const time = meta.time ?? {};
+  const time: Record<string, string> = meta.time ?? {};
   const scripts = latestMeta.scripts ?? {};
 
   const installScripts: Record<string, string> = {};
@@ -31,27 +46,73 @@ export async function fetchNpmMetadata(packageName: string): Promise<PackageMeta
     weeklyDownloads = dlData.downloads ?? 0;
   }
 
-  const maintainers = (meta.maintainers ?? []).map((m: any) => m.name ?? m.email ?? 'unknown');
+  // Current maintainers (top-level list is most reliable for the package as a whole)
+  const currentMaintainers: string[] = (meta.maintainers ?? [])
+    .map((m: any) => (m.name ?? m.email ?? 'unknown') as string);
+
+  // Find previous version to detect maintainer changes
+  const allVersions = Object.keys(meta.versions ?? {});
+  allVersions.sort((a, b) => {
+    // Lexicographic semver sort — good enough for ordering within a major
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+  const latestIdx = allVersions.indexOf(latestVersion);
+  const prevVersion: string | null = latestIdx > 0 ? allVersions[latestIdx - 1] : null;
+  const prevMeta = prevVersion ? (meta.versions[prevVersion] ?? {}) : {};
+  const previousMaintainers: string[] = (prevMeta.maintainers ?? [])
+    .map((m: any) => (m.name ?? m.email ?? 'unknown') as string);
+  const newMaintainers = currentMaintainers.filter(n => !previousMaintainers.includes(n));
+
+  // Sigstore / npm provenance (dist.attestations added ~2023)
+  const hasProvenance = !!(latestMeta.dist?.attestations);
+
+  // Time signals
+  const now = Date.now();
+  const createdAt = time.created ?? '';
+  const updatedAt = time.modified ?? '';
+  const packageAgeDays = createdAt
+    ? Math.floor((now - new Date(createdAt).getTime()) / 86_400_000) : 0;
+  const publishedDaysAgo = updatedAt
+    ? Math.floor((now - new Date(updatedAt).getTime()) / 86_400_000) : 0;
+
+  const signalsWithoutScore: Omit<RegistrySignals, 'riskScore'> = {
+    maintainerChangedInLatestRelease: newMaintainers.length > 0,
+    previousMaintainers,
+    newMaintainers,
+    packageAgeDays,
+    publishedDaysAgo,
+    typosquatCandidate: computeTyposquatCandidate(packageName, 'npm'),
+    isDependencyConfusion: isDependencyConfusion(packageName),
+    hasProvenance,
+  };
+
+  const registrySignals: RegistrySignals = {
+    ...signalsWithoutScore,
+    riskScore: computeRegistryRiskScore(signalsWithoutScore),
+  };
 
   return {
     name: packageName,
     ecosystem: 'npm',
     latestVersion,
-    createdAt: time.created ?? '',
-    updatedAt: time.modified ?? '',
+    previousVersion: prevVersion ?? undefined,
+    createdAt,
+    updatedAt,
     weeklyDownloads,
-    maintainers,
+    maintainers: currentMaintainers,
     hasInstallScripts: Object.keys(installScripts).length > 0,
     installScripts,
     repositoryUrl: meta.repository?.url ?? undefined,
     description: meta.description ?? undefined,
     license: meta.license ?? undefined,
+    registrySignals,
   };
 }
 
 export async function fetchNpmSource(
   packageName: string,
-  version: string
+  version: string,
+  previousVersion?: string
 ): Promise<PackageSource | null> {
   const encoded = encodeURIComponent(packageName);
   const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
@@ -114,6 +175,30 @@ export async function fetchNpmSource(
     }
   }
 
+  // Compute version diff: which files are NEW vs. the previous version?
+  let newFilesInVersion: string[] | undefined;
+  if (previousVersion) {
+    try {
+      const prevVersionRes = await fetch(`${REGISTRY_BASE}/${encodeURIComponent(packageName)}/${previousVersion}`);
+      if (prevVersionRes.ok) {
+        const prevMeta = await prevVersionRes.json() as any;
+        const prevTarball = prevMeta.dist?.tarball;
+        if (prevTarball) {
+          const prevTarRes = await fetch(prevTarball);
+          if (prevTarRes.ok) {
+            const { fileList: prevList } = await downloadAndExtractTarGz(prevTarRes, NPM_TEXT_PATTERN);
+            const prevSet = new Set(prevList.map(f => f.replace(/^package\//, '')));
+            newFilesInVersion = fileList
+              .map(f => f.replace(/^package\//, ''))
+              .filter(f => !prevSet.has(f));
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — version diff is best-effort
+    }
+  }
+
   return {
     name: packageName,
     ecosystem: 'npm',
@@ -123,6 +208,8 @@ export async function fetchNpmSource(
     fileList,
     fileContents,
     suspiciousFiles,
+    previousVersion,
+    newFilesInVersion,
   };
 }
 

@@ -126,7 +126,7 @@ async function investigatePackage(
       console.log(`  [analyze:${meta.name}] file ${fileIdx + 1}/${filesToInvestigate.length}: ${triageEntry.filePath} (score: ${triageEntry.score}, categories: ${[...triageEntry.categories].join('+')})`);
     }
 
-    const filePrompt = buildFileAnalysisPrompt(meta, triageEntry, fileContent);
+    const filePrompt = buildFileAnalysisPrompt(meta, triageEntry, fileContent, source);
 
     const messages: any[] = [
       new SystemMessage(systemPrompt),

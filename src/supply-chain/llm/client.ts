@@ -4,7 +4,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { StructuredToolInterface } from '@langchain/core/tools';
 
 export interface LLMClientOptions {
-  apiKey: string;
+  apiKey?: string;
   model: string;
   provider?: 'anthropic' | 'openrouter' | 'openai';
 }
@@ -15,7 +15,14 @@ export interface LLMClientOptions {
  * To add a new provider, add a case here — no other files need to change.
  */
 export function createChatModel(options: LLMClientOptions): BaseChatModel {
-  const { apiKey, model, provider = 'anthropic' } = options;
+  const { model, provider = 'anthropic' } = options;
+  // Resolve API key: explicit option > provider-specific env var > generic fallback
+  const apiKey = options.apiKey
+    ?? (provider === 'openrouter' ? process.env.OPENROUTER_API_KEY : undefined)
+    ?? (provider === 'anthropic'  ? process.env.ANTHROPIC_API_KEY  : undefined)
+    ?? (provider === 'openai'     ? process.env.OPENAI_API_KEY     : undefined)
+    ?? '';
+
 
   switch (provider) {
     case 'anthropic':
