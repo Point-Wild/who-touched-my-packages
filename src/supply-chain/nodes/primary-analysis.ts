@@ -12,6 +12,17 @@ const MAX_ROUNDS_PER_FILE = 10;
 const MIN_TRIAGE_SCORE = 8;
 
 /**
+ * Max files to send to the LLM per package. For large packages this prevents
+ * hundreds of API calls. Override with SC_MAX_LLM_FILES env var.
+ *
+ * Files matching INSTALL_TRIGGER_RE are always elevated above the cap —
+ * these file types (pth, shell scripts) should never contain executable
+ * code in a legitimate package, so any indicators are high priority.
+ */
+const MAX_LLM_FILES = parseInt(process.env.SC_MAX_LLM_FILES ?? '30');
+const INSTALL_TRIGGER_RE = /\.(pth|sh|bat|ps1)$|\/(?:post-?install|pre-?install|install)\.[jt]s$/i;
+
+/**
  * Run the tool-calling agent analysis on all packages.
  * For each package, the LLM gets tools to explore the source code interactively.
  */
@@ -98,10 +109,22 @@ async function investigatePackage(
     console.log(formatTriageResults(triageResults, allContent.size).split('\n').map(l => `  [triage:${meta.name}] ${l}`).join('\n'));
   }
 
-  // Filter to files worth investigating
-  const filesToInvestigate = triageResults.filter(r => r.score >= MIN_TRIAGE_SCORE);
+  // Filter to files worth investigating, then apply smart cap
+  const aboveThreshold = triageResults.filter(r => r.score >= MIN_TRIAGE_SCORE);
+
+  let filesToInvestigate = aboveThreshold;
+  if (aboveThreshold.length > MAX_LLM_FILES) {
+    // Always include install-trigger file types (pth, shell scripts, etc.) —
+    // these are never legitimately used to hold executable code.
+    const priority = aboveThreshold.filter(r => INSTALL_TRIGGER_RE.test(r.filePath));
+    const rest = aboveThreshold
+      .filter(r => !INSTALL_TRIGGER_RE.test(r.filePath))
+      .slice(0, Math.max(0, MAX_LLM_FILES - priority.length));
+    filesToInvestigate = [...priority, ...rest];
+  }
+
   if (verbose) {
-    console.log(`  [triage:${meta.name}] ${filesToInvestigate.length} files above score threshold (${MIN_TRIAGE_SCORE})`);
+    console.log(`  [triage:${meta.name}] ${aboveThreshold.length} files above score threshold (${MIN_TRIAGE_SCORE}), sending ${filesToInvestigate.length} to LLM (cap: ${MAX_LLM_FILES})`);
   }
 
   if (filesToInvestigate.length === 0) {
@@ -126,7 +149,7 @@ async function investigatePackage(
       console.log(`  [analyze:${meta.name}] file ${fileIdx + 1}/${filesToInvestigate.length}: ${triageEntry.filePath} (score: ${triageEntry.score}, categories: ${[...triageEntry.categories].join('+')})`);
     }
 
-    const filePrompt = buildFileAnalysisPrompt(meta, triageEntry, fileContent);
+    const filePrompt = buildFileAnalysisPrompt(meta, triageEntry, fileContent, source);
 
     const messages: any[] = [
       new SystemMessage(systemPrompt),

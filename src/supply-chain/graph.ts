@@ -41,6 +41,7 @@ export interface GraphOptions {
   chatModel: BaseChatModel;
   modelName: string;
   concurrency: number;
+  maxPackages?: number;
   onProgress?: (stage: string, done: number, total: number) => void;
 }
 
@@ -48,13 +49,14 @@ export interface GraphOptions {
  * Build and compile the LangGraph supply chain analysis workflow.
  */
 export function buildAnalysisGraph(options: GraphOptions) {
-  const { chatModel, modelName, concurrency, onProgress } = options;
+  const { chatModel, modelName, concurrency, maxPackages = 0, onProgress } = options;
 
   const graph = new StateGraph(AnalysisAnnotation)
     .addNode('fetch_metadata', async (state: AnalysisState) => {
       const { metadata, sources } = await fetchMetadataNode(
         state.dependencies,
         concurrency,
+        maxPackages,
         (done, total) => onProgress?.('Fetching package metadata & source', done, total)
       );
       return { metadata, sources };
