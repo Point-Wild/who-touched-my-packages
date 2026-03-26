@@ -14,7 +14,7 @@ import { detectLanguages } from './scanner/language-detector.js';
 import type { Dependency, DependencyEdge } from './scanner/types.js';
 import { analyzeSupplyChain, type SupplyChainReport } from './supply-chain/index.js';
 import { Reporter } from './ui/reporter.js';
-import { icons, theme } from './ui/theme.js';
+import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
 import { cloneRepository } from './utils/git-clone.js';
 import { Logger } from './utils/logger.js';
@@ -32,19 +32,32 @@ program
   .option('-s, --severity <level>', 'Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW)')
   .option('-f, --fail-on <level>', 'Exit with error code if vulnerabilities at or above this severity are found')
   .option('-j, --json', 'Output results as JSON', false)
+  .option('-o, --output <file>', 'Save report to file instead of stdout/browser')
   .option('--html', 'Generate HTML report and open in browser (default)', true)
   .option('--no-html', 'Disable HTML report generation')
+  .option('--no-open', 'Generate HTML report but do not open in browser')
   .option('-v, --verbose', 'Verbose output', false)
+  .option('-q, --quiet', 'Suppress non-error output', false)
+  .option('--no-color', 'Disable colored terminal output')
+  .option('--timeout <seconds>', 'Operation timeout in seconds', '300')
+  .option('--git-clone-depth <number>', 'Git clone depth (shallow clones)', '0')
+  .option('--max-depth <number>', 'Maximum directory recursion depth', '0')
   .option('--supply-chain', 'Enable supply chain security analysis', false)
   .option('--supply-chain-model <model>', 'LLM model to use for supply chain analysis', 'claude-sonnet-4-5-20241022')
   .option('--supply-chain-provider <provider>', 'LLM provider (anthropic, openrouter, openai)', 'anthropic')
   .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', '3')
-  .option('--supply-chain-api-key <key>', 'API key for the LLM provider (overrides OPENROUTER_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY env vars)')
   .option('--supply-chain-depth <number>', 'Transitive dependency depth to analyse (1 = direct only)', '1')
   .option('--supply-chain-max-packages <number>', 'Maximum packages to analyse in supply chain scan (0 = unlimited)', '0')
+  .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
   .parse();
 
 const options = program.opts();
+
+// Handle --no-color option early (before any output)
+if (options.color === false) {
+  setColorEnabled(false);
+  recreateTheme();
+}
 
 // Auto-disable HTML generation in CI environments
 const isCI = process.env.CI ||
@@ -68,7 +81,7 @@ async function main() {
   let cleanup: (() => Promise<void>) | null = null;
   
   if (options.repo) {
-    if (!options.json) {
+    if (!options.json && !options.quiet) {
       const spinner = ora({
         text: `Cloning repository${options.branch ? ` (branch: ${options.branch})` : ''}...`,
         color: 'cyan',
@@ -78,6 +91,7 @@ async function main() {
         const cloneResult = await cloneRepository({
           repoUrl: options.repo,
           branch: options.branch,
+          depth: parseInt(options.gitCloneDepth, 10) || undefined,
         });
         scanPath = cloneResult.path;
         cleanup = cloneResult.cleanup;
@@ -90,6 +104,7 @@ async function main() {
       const cloneResult = await cloneRepository({
         repoUrl: options.repo,
         branch: options.branch,
+        depth: parseInt(options.gitCloneDepth, 10) || undefined,
       });
       scanPath = cloneResult.path;
       cleanup = cloneResult.cleanup;
@@ -98,28 +113,28 @@ async function main() {
     scanPath = resolve(cwd(), options.path);
   }
   
-  if (!options.json) {
+  if (!options.json && !options.quiet) {
     clack.intro(theme.bold(`${icons.shield} Who Touched My Packages?`));
     console.log(theme.dim('  ⚠️  This program is a work in progress. Accuracy is not guaranteed.\n'));
   }
   
   let spinner: ReturnType<typeof ora> | null = null;
   
-  if (!options.json) {
+  if (!options.json && !options.quiet) {
     spinner = ora({
       text: 'Scanning for dependency files...',
       color: 'cyan',
     }).start();
   }
   
-  const files = await findDependencyFiles(scanPath, options.exclude);
+  const files = await findDependencyFiles(scanPath, options.exclude, parseInt(options.maxDepth, 10) || 0);
   
   if (spinner) {
     spinner.text = 'Parsing dependencies...';
   }
   
   if (files.length === 0) {
-    if (!options.json) {
+    if (!options.json && !options.quiet) {
       clack.outro(theme.dim('No dependency files found.'));
     }
     process.exit(0);
@@ -137,6 +152,7 @@ async function main() {
     verbose: options.verbose,
     html: options.html,
     supplyChain: options.supplyChain,
+    output: options.output,
   });
   
   // Build dependency trees for graph visualization and/or transitive supply chain scanning
@@ -199,7 +215,7 @@ async function main() {
   }
   
   if (dependencies.length === 0) {
-    if (!options.json && !options.html) {
+    if (!options.json && !options.html && !options.quiet) {
       clack.outro(theme.dim('No dependencies found.'));
     }
     process.exit(0);
@@ -222,12 +238,12 @@ async function main() {
     
     try {
       supplyChainReport = await analyzeSupplyChain(allDependencies, {
-        apiKey: options.supplyChainApiKey,
         model: options.supplyChainModel,
         provider: options.supplyChainProvider,
         concurrency: parseInt(options.supplyChainConcurrency, 10),
         depth: supplyChainDepth,
         maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
+        dryRun: options.supplyChainDryRun,
       }, (stage, done, total) => {
         if (spinner) {
           spinner.text = `Supply chain analysis: ${stage} (${done}/${total})...`;
@@ -251,7 +267,7 @@ async function main() {
   }
   
   if (options.html) {
-    if (!options.json) {
+    if (!options.json && !options.quiet) {
       spinner = ora({
         text: 'Generating HTML report...',
         color: 'cyan',
@@ -265,21 +281,29 @@ async function main() {
       spinner.succeed('HTML report generated');
     }
     
-    if (!options.json) {
-      console.log(theme.info(`\n📄 Opening report in browser...`));
-    }
-    
-    await open(server.url);
-    
-    if (!options.json) {
-      console.log(theme.success(`${icons.success} Report opened in browser!`));
-      console.log(theme.dim(`Server running at ${server.url}`));
-      console.log(theme.dim('Press Ctrl+C to stop the server\n'));
+    if (!options.open) {
+      // --no-open flag was used
+      if (!options.json && !options.quiet) {
+        console.log(theme.info(`\n📄 HTML report available at: ${server.url}`));
+        console.log(theme.dim('Server running. Press Ctrl+C to stop.\n'));
+      }
+    } else {
+      if (!options.json && !options.quiet) {
+        console.log(theme.info(`\n📄 Opening report in browser...`));
+      }
+      
+      await open(server.url);
+      
+      if (!options.json && !options.quiet) {
+        console.log(theme.success(`${icons.success} Report opened in browser!`));
+        console.log(theme.dim(`Server running at ${server.url}`));
+        console.log(theme.dim('Press Ctrl+C to stop the server\n'));
+      }
     }
     
     // Keep the process running
     process.on('SIGINT', async () => {
-      if (!options.json) {
+      if (!options.json && !options.quiet) {
         console.log(theme.dim('\n\nShutting down server...'));
       }
       server.close();
@@ -312,7 +336,7 @@ async function main() {
 }
 
 main().catch(async (error) => {
-  if (!options.json) {
+  if (!options.json && !options.quiet) {
     clack.outro(theme.critical(`Error: ${error.message}`));
   } else {
     console.error(JSON.stringify({ error: error.message }));

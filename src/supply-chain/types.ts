@@ -80,6 +80,7 @@ export interface SupplyChainOptions {
   depth?: number;
   /** Hard cap on number of packages analyzed. 0 = unlimited (default). */
   maxPackages?: number;
+  dryRun?: boolean;
 }
 
 export interface PackageMetadata {

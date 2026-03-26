@@ -15,6 +15,16 @@ const { title } = Astro.locals.starlightRoute.entry.data;
         </div>
     </div>
 </div>
+<script is:inline>
+// Force the theme to dark and save to localStorage
+const theme = 'dark';
+document.documentElement.setAttribute('data-theme', theme);
+try {
+    localStorage.setItem('starlight-theme', theme);
+} catch (e) {
+    // Optional: handle localStorage errors
+}
+</script>
 
 <h1 id="_top">{title}</h1>
 

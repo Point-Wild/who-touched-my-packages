@@ -103,6 +103,54 @@ wtmp --severity HIGH
 wtmp --path /path/to/project
 ```
 
+### Save Report to File
+
+Save JSON output to a file:
+
+```bash
+wtmp --json --output report.json
+```
+
+### Quiet Mode
+
+Suppress non-error output:
+
+```bash
+wtmp --quiet
+```
+
+### Disable Colors
+
+Disable colored terminal output:
+
+```bash
+wtmp --no-color
+```
+
+### Git Clone Depth
+
+Perform a shallow clone (useful for large repositories):
+
+```bash
+wtmp --repo https://github.com/user/repo --git-clone-depth 1
+```
+
+### Maximum Directory Depth
+
+Limit how deep the scanner searches:
+
+```bash
+wtmp --max-depth 3
+```
+
+### HTML Report Without Opening Browser
+
+Generate HTML report but don't auto-open:
+
+```bash
+wtmp --no-open
+```
+
 ## Scanning Remote Repositories
 
 You can scan any Git repository without cloning it manually. The tool will automatically clone it to a temporary directory, scan it, and clean up afterwards.
@@ -284,6 +332,27 @@ Without a token:
 
 With a token:
 - 5,000 requests per hour
+
+### Supply Chain Analysis API Keys (Optional)
+
+For supply chain security analysis, you need to set an API key for your chosen LLM provider:
+
+```bash
+# For Anthropic (default)
+export ANTHROPIC_API_KEY=sk-ant-your-key
+
+# For OpenAI
+export OPENAI_API_KEY=sk-your-key
+
+# For OpenRouter
+export OPENROUTER_API_KEY=sk-or-your-key
+```
+
+Then run with supply chain analysis:
+
+```bash
+wtmp --supply-chain
+```
 
 ## Next Steps
 

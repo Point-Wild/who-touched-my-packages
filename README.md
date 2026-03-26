@@ -91,14 +91,21 @@ wtmp --exclude test fixtures examples
 | `--severity <level>` | `-s` | Filter by minimum severity (CRITICAL, HIGH, MEDIUM, LOW) | All |
 | `--fail-on <level>` | `-f` | Exit with error if vulnerabilities at or above this level are found | None |
 | `--json` | `-j` | Output results as JSON | `false` |
+| `--output <file>` | `-o` | Save report to file instead of stdout/browser | None |
 | `--html` | | Generate interactive HTML report and open in browser (default) | `true` |
 | `--no-html` | | Disable HTML report generation and use terminal output | `false` |
+| `--no-open` | | Generate HTML report but do not open in browser | `false` |
+| `--quiet` | `-q` | Suppress non-error output | `false` |
+| `--verbose` | `-v` | Verbose output | `false` |
+| `--no-color` | | Disable colored terminal output | `false` |
+| `--timeout <seconds>` | | Operation timeout in seconds | `300` |
+| `--git-clone-depth <number>` | | Git clone depth for shallow clones (`0` = full clone) | `0` |
+| `--max-depth <number>` | | Maximum directory recursion depth (`0` = unlimited) | `0` |
 | `--supply-chain` | | Enable supply chain security analysis | `false` |
 | `--supply-chain-model <model>` | | LLM model to use for supply chain analysis | `claude-sonnet-4-5-20241022` |
 | `--supply-chain-provider <provider>` | | LLM provider (anthropic, openrouter, openai) | `anthropic` |
 | `--supply-chain-concurrency <number>` | | Number of concurrent LLM requests | `3` |
 | `--supply-chain-dry-run` | | Skip actual LLM calls (for testing) | `false` |
-| `--verbose` | `-v` | Verbose output | `false` |
 | `--version` | | Show version | |
 | `--help` | `-h` | Show help | |
 
@@ -257,6 +264,9 @@ See [datasources.md](./datasources.md) for details on all current and planned da
 ### Environment Variables
 
 - `GITHUB_TOKEN` - Optional GitHub personal access token for higher API rate limits
+- `ANTHROPIC_API_KEY` - API key for Anthropic LLM provider (for supply chain analysis)
+- `OPENAI_API_KEY` - API key for OpenAI LLM provider (for supply chain analysis)
+- `OPENROUTER_API_KEY` - API key for OpenRouter LLM provider (for supply chain analysis)
 
 ### Exit Codes
 

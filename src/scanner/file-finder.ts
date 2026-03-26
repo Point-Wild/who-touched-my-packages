@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { DependencyFile } from './types.js';
 
@@ -24,12 +24,18 @@ const TARGET_FILES = new Set(['package.json', 'requirements.txt']);
 
 export async function findDependencyFiles(
   rootPath: string,
-  excludePatterns: string[] = []
+  excludePatterns: string[] = [],
+  maxDepth: number = 0
 ): Promise<DependencyFile[]> {
   const results: DependencyFile[] = [];
   
-  async function walk(currentPath: string): Promise<void> {
+  async function walk(currentPath: string, currentDepth: number): Promise<void> {
     try {
+      // Check depth limit if specified
+      if (maxDepth > 0 && currentDepth > maxDepth) {
+        return;
+      }
+      
       const entries = await readdir(currentPath, { withFileTypes: true });
       
       for (const entry of entries) {
@@ -45,7 +51,7 @@ export async function findDependencyFiles(
             continue;
           }
           
-          await walk(fullPath);
+          await walk(fullPath, currentDepth + 1);
         } else if (entry.isFile() && TARGET_FILES.has(entry.name)) {
           const type = entry.name as 'package.json' | 'requirements.txt';
           results.push({
@@ -60,6 +66,6 @@ export async function findDependencyFiles(
     }
   }
   
-  await walk(rootPath);
+  await walk(rootPath, 1);
   return results;
 }

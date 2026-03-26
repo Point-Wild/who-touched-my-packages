@@ -9,6 +9,7 @@ const execAsync = promisify(exec);
 export interface CloneOptions {
   repoUrl: string;
   branch?: string;
+  depth?: number;
 }
 
 export interface CloneResult {
@@ -26,7 +27,11 @@ export async function cloneRepository(options: CloneOptions): Promise<CloneResul
       cloneArgs.push('--branch', options.branch);
     }
     
-    cloneArgs.push('--depth', '1');
+    // Only use depth if explicitly specified (> 0), otherwise do full clone
+    if (options.depth && options.depth > 0) {
+      cloneArgs.push('--depth', String(options.depth));
+    }
+    
     cloneArgs.push(options.repoUrl);
     cloneArgs.push(tempDir);
     
