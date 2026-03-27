@@ -4,7 +4,7 @@ export interface Vulnerability {
   id: string;
   packageName: string;
   packageVersion: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo';
   severity: Severity;
   title: string;
   description: string;

@@ -89,7 +89,7 @@ export interface DependencyNode {
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo';
   file: string;
   isDev?: boolean;
   dependencies: DependencyNode[];
@@ -106,6 +106,8 @@ export interface DependencyTree {
 
 const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
+
+const CRATES_REGISTRY_CACHE = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
@@ -272,9 +274,177 @@ async function resolvePypiDependency(
   return node;
 }
 
+async function fetchCrateFromRegistry(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (CRATES_REGISTRY_CACHE.has(cacheKey)) {
+    return CRATES_REGISTRY_CACHE.get(cacheKey);
+  }
+
+  try {
+    // Normalize version spec to get a concrete version
+    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    const url = `https://crates.io/api/v1/crates/${name}`;
+
+    const response = await fetch(url, {
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'who-touched-my-deps (security scanner)'
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    CRATES_REGISTRY_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+interface CargoDepInfo {
+  name: string;
+  versionSpec: string;
+  isDev?: boolean;
+}
+
+function parseCargoTomlForTree(content: string): CargoDepInfo[] {
+  const dependencies: CargoDepInfo[] = [];
+  const lines = content.split('\n');
+  let inDependencies = false;
+  let inDevDependencies = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Check for section headers
+    if (trimmed.startsWith('[')) {
+      const section = trimmed.replace(/\[|\]/g, '').trim();
+      inDependencies = section === 'dependencies' || section.endsWith('.dependencies');
+      inDevDependencies = section === 'dev-dependencies' || section === 'build-dependencies';
+      continue;
+    }
+    
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    
+    // Parse dependency lines
+    if (inDependencies || inDevDependencies) {
+      // Match simple format: name = "version"
+      const simpleMatch = trimmed.match(/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/);
+      if (simpleMatch) {
+        dependencies.push({
+          name: simpleMatch[1],
+          versionSpec: simpleMatch[2],
+          isDev: inDevDependencies,
+        });
+      } else {
+        // Match inline table format: name = { version = "1.0" }
+        const tableMatch = trimmed.match(/^([a-zA-Z0-9_-]+)\s*=\s*\{/);
+        if (tableMatch) {
+          const name = tableMatch[1];
+          const versionMatch = trimmed.match(/version\s*=\s*"([^"]+)"/);
+          const versionSpec = versionMatch ? versionMatch[1] : '*';
+          
+          dependencies.push({
+            name,
+            versionSpec,
+            isDev: inDevDependencies,
+          });
+        }
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+async function resolveCargoDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  // Fetch from crates.io registry
+  const crate = await fetchCrateFromRegistry(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+  
+  if (crate?.crate?.max_version) {
+    resolvedVersion = crate.crate.max_version;
+  } else if (crate?.crate?.max_stable_version) {
+    resolvedVersion = crate.crate.max_stable_version;
+  }
+  
+  // Find specific version in versions array if available
+  if (crate?.versions) {
+    const targetVersion = resolvedVersion === 'latest' 
+      ? crate.versions.find((v: any) => v.num === crate.crate?.max_stable_version || v.num === crate.crate?.max_version)
+      : crate.versions.find((v: any) => v.num === resolvedVersion);
+    
+    if (targetVersion) {
+      resolvedVersion = targetVersion.num;
+    }
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'cargo',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  // Try to get dependencies from the crate version info
+  if (crate?.versions && depth < MAX_DEPTH - 1) {
+    const targetVersion = crate.versions.find((v: any) => v.num === resolvedVersion) || crate.versions[0];
+    
+    if (targetVersion?.dependencies) {
+      for (const dep of targetVersion.dependencies) {
+        // Skip optional dependencies and dev-dependencies for tree simplicity
+        if (dep.optional || dep.kind === 'dev') continue;
+        
+        const childNode = await resolveCargoDependency(
+          dep.crate_id,
+          dep.req || '*',
+          parentFile,
+          dep.kind === 'dev',
+          depth + 1,
+          new Set(visited), // Create new set for each branch to allow same dep via different paths
+          [...currentPath, name]
+        );
+        if (childNode) {
+          node.dependencies.push(childNode);
+        }
+      }
+    }
+  }
+  
+  return node;
+}
+
 export async function buildDependencyTree(
   rootFile: string,
-  ecosystem: 'npm' | 'pypi'
+  ecosystem: 'npm' | 'pypi' | 'cargo'
 ): Promise<DependencyTree> {
   const tree: DependencyTree = {
     roots: [],
@@ -370,6 +540,32 @@ export async function buildDependencyTree(
       console.error(`Failed to parse ${rootFile}:`, error);
     }
   }
+
+  if (ecosystem === 'cargo') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const visited = new Set<string>();
+      const dependencies = parseCargoTomlForTree(content);
+      
+      for (const dep of dependencies) {
+        const node = await resolveCargoDependency(
+          dep.name,
+          dep.versionSpec,
+          rootFile,
+          dep.isDev || false,
+          0,
+          visited,
+          []
+        );
+        if (node) {
+          tree.roots.push(node);
+          collectNodesAndEdges(node, tree, null, dep.isDev ? 'dev' : 'dependency');
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
   
   return tree;
 }
@@ -412,7 +608,7 @@ export function flattenDependencyTree(tree: DependencyTree): Array<{
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo';
   file: string;
   isDev?: boolean;
   depth: number;
