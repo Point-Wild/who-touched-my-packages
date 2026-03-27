@@ -290,7 +290,7 @@ async function fetchCrateFromRegistry(name: string, versionSpec: string): Promis
     const response = await fetch(url, {
       headers: { 
         'Accept': 'application/json',
-        'User-Agent': 'who-touched-my-deps (security scanner)'
+        'User-Agent': 'who-touched-my-packages (security scanner)'
       },
     });
 
@@ -317,7 +317,7 @@ async function fetchCrateDependencies(name: string, version: string): Promise<an
     const response = await fetch(url, {
       headers: { 
         'Accept': 'application/json',
-        'User-Agent': 'who-touched-my-deps (security scanner)'
+        'User-Agent': 'who-touched-my-packages (security scanner)'
       },
     });
 
