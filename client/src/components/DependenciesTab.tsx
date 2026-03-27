@@ -68,7 +68,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
       ...dep,
       isVulnerable: vulnerablePackages.has(dep.name),
       maxSeverity: vulnerabilitySeverityMap.get(dep.name) || 'N/A',
-      provenanceStatus: dep.provenance === true ? 'Verified' : dep.provenance === false ? 'Missing' : 'Unknown',
+      provenanceStatus: dep.provenance === true ? 'Enabled' : dep.provenance === false ? 'Missing' : 'Unknown',
     }));
   }, [filteredDeps, vulnerablePackages, vulnerabilitySeverityMap]);
 
@@ -179,7 +179,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
                     <td>{dep.isDev ? 'Dev' : 'Production'}</td>
                     <td>
                       {dep.provenance === true ? (
-                        <span style={{ color: 'var(--low)' }}>✓ Verified</span>
+                        <span style={{ color: 'var(--low)' }}>✓ Enabled</span>
                       ) : dep.provenance === false ? (
                         <span style={{ color: 'var(--high)', fontWeight: 600 }}>⚠️ Missing</span>
                       ) : (

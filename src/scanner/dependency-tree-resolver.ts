@@ -89,7 +89,7 @@ export interface DependencyNode {
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   file: string;
   isDev?: boolean;
   dependencies: DependencyNode[];
@@ -106,6 +106,10 @@ export interface DependencyTree {
 
 const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
+
+const CRATES_REGISTRY_CACHE = new Map<string, any>();
+const GO_PROXY_CACHE = new Map<string, any>();
+const RUBYGEMS_CACHE = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
@@ -272,9 +276,520 @@ async function resolvePypiDependency(
   return node;
 }
 
+async function fetchCrateFromRegistry(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (CRATES_REGISTRY_CACHE.has(cacheKey)) {
+    return CRATES_REGISTRY_CACHE.get(cacheKey);
+  }
+
+  try {
+    // Normalize version spec to get a concrete version
+    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    const url = `https://crates.io/api/v1/crates/${name}`;
+
+    const response = await fetch(url, {
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'who-touched-my-packages (security scanner)'
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    CRATES_REGISTRY_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function fetchCrateDependencies(name: string, version: string): Promise<any[] | null> {
+  const cacheKey = `deps:${name}@${version}`;
+  if (CRATES_REGISTRY_CACHE.has(cacheKey)) {
+    return CRATES_REGISTRY_CACHE.get(cacheKey);
+  }
+
+  try {
+    const url = `https://crates.io/api/v1/crates/${name}/${version}/dependencies`;
+    const response = await fetch(url, {
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'who-touched-my-packages (security scanner)'
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json() as { dependencies?: any[] };
+    const dependencies = data.dependencies || [];
+    CRATES_REGISTRY_CACHE.set(cacheKey, dependencies);
+    return dependencies;
+  } catch (error) {
+    return null;
+  }
+}
+
+interface CargoDepInfo {
+  name: string;
+  versionSpec: string;
+  isDev?: boolean;
+}
+
+function parseCargoTomlForTree(content: string): CargoDepInfo[] {
+  const dependencies: CargoDepInfo[] = [];
+  const lines = content.split('\n');
+  let inDependencies = false;
+  let inDevDependencies = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Check for section headers
+    if (trimmed.startsWith('[')) {
+      const section = trimmed.replace(/\[|\]/g, '').trim();
+      inDependencies = section === 'dependencies' || section.endsWith('.dependencies');
+      inDevDependencies = section === 'dev-dependencies' || section === 'build-dependencies';
+      continue;
+    }
+    
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    
+    // Parse dependency lines
+    if (inDependencies || inDevDependencies) {
+      // Match simple format: name = "version"
+      const simpleMatch = trimmed.match(/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/);
+      if (simpleMatch) {
+        dependencies.push({
+          name: simpleMatch[1],
+          versionSpec: simpleMatch[2],
+          isDev: inDevDependencies,
+        });
+      } else {
+        // Match inline table format: name = { version = "1.0" }
+        const tableMatch = trimmed.match(/^([a-zA-Z0-9_-]+)\s*=\s*\{/);
+        if (tableMatch) {
+          const name = tableMatch[1];
+          const versionMatch = trimmed.match(/version\s*=\s*"([^"]+)"/);
+          const versionSpec = versionMatch ? versionMatch[1] : '*';
+          
+          dependencies.push({
+            name,
+            versionSpec,
+            isDev: inDevDependencies,
+          });
+        }
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+async function resolveCargoDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  // Fetch from crates.io registry
+  const crate = await fetchCrateFromRegistry(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+  
+  if (crate?.crate?.max_version) {
+    resolvedVersion = crate.crate.max_version;
+  } else if (crate?.crate?.max_stable_version) {
+    resolvedVersion = crate.crate.max_stable_version;
+  }
+  
+  // Find specific version in versions array if available
+  if (crate?.versions) {
+    const targetVersion = resolvedVersion === 'latest' 
+      ? crate.versions.find((v: any) => v.num === crate.crate?.max_stable_version || v.num === crate.crate?.max_version)
+      : crate.versions.find((v: any) => v.num === resolvedVersion);
+    
+    if (targetVersion) {
+      resolvedVersion = targetVersion.num;
+    }
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'cargo',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  // Fetch dependencies from separate crates.io endpoint
+  if (depth < MAX_DEPTH - 1) {
+    const deps = await fetchCrateDependencies(name, resolvedVersion);
+    
+    if (deps) {
+      for (const dep of deps) {
+        // Skip optional dependencies and dev-dependencies for tree simplicity
+        if (dep.optional || dep.kind === 'dev') continue;
+        
+        const childNode = await resolveCargoDependency(
+          dep.crate_name || dep.crate_id,
+          dep.req || '*',
+          parentFile,
+          dep.kind === 'dev',
+          depth + 1,
+          new Set(visited),
+          [...currentPath, name]
+        );
+        if (childNode) {
+          node.dependencies.push(childNode);
+        }
+      }
+    }
+  }
+  
+  return node;
+}
+
+interface GoDepInfo {
+  name: string;
+  versionSpec: string;
+  isDev?: boolean;
+}
+
+function parseGoModForTree(content: string): GoDepInfo[] {
+  const dependencies: GoDepInfo[] = [];
+  const lines = content.split('\n');
+  let inRequire = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('require (')) {
+      inRequire = true;
+      continue;
+    }
+    
+    if (inRequire && trimmed === ')') {
+      inRequire = false;
+      continue;
+    }
+    
+    if (!inRequire && trimmed.startsWith('require ')) {
+      const reqMatch = trimmed.match(/require\s+(\S+)\s+(\S+)/);
+      if (reqMatch) {
+        dependencies.push({
+          name: reqMatch[1],
+          versionSpec: reqMatch[2],
+          isDev: trimmed.includes('// indirect'),
+        });
+      }
+      continue;
+    }
+    
+    if (inRequire) {
+      const match = trimmed.match(/^(\S+)\s+(\S+)/);
+      if (match) {
+        dependencies.push({
+          name: match[1],
+          versionSpec: match[2],
+          isDev: trimmed.includes('// indirect'),
+        });
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+async function fetchGoModuleFromProxy(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (GO_PROXY_CACHE.has(cacheKey)) {
+    return GO_PROXY_CACHE.get(cacheKey);
+  }
+
+  try {
+    // Go module proxy URL format
+    const encodedName = name.replace(/\//g, '%2F');
+    const version = versionSpec.replace(/^[>=<~!^]+/, '').replace(/^v/, '') || 'latest';
+    const url = `https://proxy.golang.org/${encodedName}/@v/v${version}.info`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      // Try without v prefix
+      const urlNoV = `https://proxy.golang.org/${encodedName}/@v/${version}.info`;
+      const responseNoV = await fetch(urlNoV, {
+        headers: { 'Accept': 'application/json' },
+      });
+      
+      if (!responseNoV.ok) {
+        return null;
+      }
+      
+      const data = await responseNoV.json();
+      GO_PROXY_CACHE.set(cacheKey, data);
+      return data;
+    }
+
+    const data = await response.json();
+    GO_PROXY_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function resolveGoDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  // Fetch from Go module proxy
+  const module = await fetchGoModuleFromProxy(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '').replace(/^v/, '') || 'latest';
+  
+  if (module?.Version) {
+    resolvedVersion = module.Version.replace(/^v/, '');
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'go',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  // Fetch transitive dependencies from the module's go.mod
+  if (depth < MAX_DEPTH - 1) {
+    const goModContent = await fetchGoModFromProxy(name, resolvedVersion);
+    if (goModContent) {
+      const transitiveDeps = parseGoModForTree(goModContent);
+      
+      for (const dep of transitiveDeps) {
+        // Skip indirect dependencies to reduce noise
+        if (dep.isDev) continue;
+        
+        const childNode = await resolveGoDependency(
+          dep.name,
+          dep.versionSpec,
+          parentFile,
+          dep.isDev || false,
+          depth + 1,
+          new Set(visited),
+          [...currentPath, name]
+        );
+        if (childNode) {
+          node.dependencies.push(childNode);
+        }
+      }
+    }
+  }
+  
+  return node;
+}
+
+async function fetchGoModFromProxy(name: string, version: string): Promise<string | null> {
+  try {
+    const encodedName = name.replace(/\//g, '%2F');
+    const cleanVersion = version.replace(/^v/, '');
+    // Try to fetch go.mod from the module proxy
+    const url = `https://proxy.golang.org/${encodedName}/@v/v${cleanVersion}.mod`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      // Try without v prefix
+      const urlNoV = `https://proxy.golang.org/${encodedName}/@v/${cleanVersion}.mod`;
+      const responseNoV = await fetch(urlNoV);
+      if (!responseNoV.ok) {
+        return null;
+      }
+      return await responseNoV.text();
+    }
+    return await response.text();
+  } catch (error) {
+    return null;
+  }
+}
+
+interface RubyDepInfo {
+  name: string;
+  versionSpec: string;
+  isDev?: boolean;
+}
+
+function parseGemfileLockForTree(content: string): RubyDepInfo[] {
+  const dependencies: RubyDepInfo[] = [];
+  const lines = content.split('\n');
+  let inSpecsSection = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    if (trimmed === 'GEM') {
+      continue;
+    }
+    
+    if (trimmed === 'specs:') {
+      inSpecsSection = true;
+      continue;
+    }
+    
+    if (trimmed === 'DEPENDENCIES' || trimmed.startsWith('DEPENDENCIES')) {
+      inSpecsSection = false;
+      continue;
+    }
+    
+    if (inSpecsSection && (trimmed === '' || trimmed.startsWith('PLATFORMS') || trimmed.startsWith('BUNDLED WITH'))) {
+      inSpecsSection = false;
+      continue;
+    }
+    
+    if (inSpecsSection) {
+      const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*\(([0-9][^)]*)\)/);
+      if (match) {
+        dependencies.push({
+          name: match[1],
+          versionSpec: match[2],
+          isDev: false,
+        });
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+async function fetchGemFromRubygems(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (RUBYGEMS_CACHE.has(cacheKey)) {
+    return RUBYGEMS_CACHE.get(cacheKey);
+  }
+
+  try {
+    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    const url = normalizedVersion === 'latest'
+      ? `https://rubygems.org/api/v1/gems/${name}.json`
+      : `https://rubygems.org/api/v2/rubygems/${name}/versions/${normalizedVersion}.json`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    RUBYGEMS_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function resolveRubyDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  const gem = await fetchGemFromRubygems(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '').trim() || 'latest';
+  
+  if (gem?.version) {
+    resolvedVersion = gem.version;
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'ruby',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  if (depth < MAX_DEPTH - 1 && gem?.dependencies) {
+    for (const dep of gem.dependencies.runtime || []) {
+      const childNode = await resolveRubyDependency(
+        dep.name,
+        dep.requirements || '*',
+        parentFile,
+        false,
+        depth + 1,
+        new Set(visited),
+        [...currentPath, name]
+      );
+      if (childNode) {
+        node.dependencies.push(childNode);
+      }
+    }
+  }
+  
+  return node;
+}
+
 export async function buildDependencyTree(
   rootFile: string,
-  ecosystem: 'npm' | 'pypi'
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby'
 ): Promise<DependencyTree> {
   const tree: DependencyTree = {
     roots: [],
@@ -370,6 +885,84 @@ export async function buildDependencyTree(
       console.error(`Failed to parse ${rootFile}:`, error);
     }
   }
+
+  if (ecosystem === 'cargo') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const visited = new Set<string>();
+      const dependencies = parseCargoTomlForTree(content);
+      
+      for (const dep of dependencies) {
+        const node = await resolveCargoDependency(
+          dep.name,
+          dep.versionSpec,
+          rootFile,
+          dep.isDev || false,
+          0,
+          visited,
+          []
+        );
+        if (node) {
+          tree.roots.push(node);
+          collectNodesAndEdges(node, tree, null, dep.isDev ? 'dev' : 'dependency');
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
+
+  if (ecosystem === 'go') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const visited = new Set<string>();
+      const dependencies = parseGoModForTree(content);
+      
+      for (const dep of dependencies) {
+        const node = await resolveGoDependency(
+          dep.name,
+          dep.versionSpec,
+          rootFile,
+          dep.isDev || false,
+          0,
+          visited,
+          []
+        );
+        if (node) {
+          tree.roots.push(node);
+          collectNodesAndEdges(node, tree, null, dep.isDev ? 'dev' : 'dependency');
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
+  
+  if (ecosystem === 'ruby') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const visited = new Set<string>();
+      const dependencies = parseGemfileLockForTree(content);
+      
+      for (const dep of dependencies) {
+        const node = await resolveRubyDependency(
+          dep.name,
+          dep.versionSpec,
+          rootFile,
+          dep.isDev || false,
+          0,
+          visited,
+          []
+        );
+        if (node) {
+          tree.roots.push(node);
+          collectNodesAndEdges(node, tree, null, dep.isDev ? 'dev' : 'dependency');
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
   
   return tree;
 }
@@ -412,7 +1005,7 @@ export function flattenDependencyTree(tree: DependencyTree): Array<{
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   file: string;
   isDev?: boolean;
   depth: number;

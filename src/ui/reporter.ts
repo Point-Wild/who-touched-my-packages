@@ -54,8 +54,8 @@ export class Reporter {
     
     // Show provenance summary if dependencies are available
     if (dependencies && dependencies.length > 0) {
-      const verifiedPackages = dependencies.filter(d => d.provenance !== undefined);
-      if (verifiedPackages.length > 0) {
+      const enabledPackages = dependencies.filter(d => d.provenance !== undefined);
+      if (enabledPackages.length > 0) {
         console.log(formatProvenanceSummary(dependencies));
       }
     }

@@ -20,7 +20,7 @@ const IGNORE_DIRS = new Set([
   'vendor',
 ]);
 
-const TARGET_FILES = new Set(['package.json', 'requirements.txt']);
+const TARGET_FILES = new Set(['package.json', 'requirements.txt', 'Cargo.toml', 'Cargo.lock', 'go.mod', 'go.sum', 'Gemfile.lock']);
 
 export async function findDependencyFiles(
   rootPath: string,
@@ -53,7 +53,7 @@ export async function findDependencyFiles(
           
           await walk(fullPath, currentDepth + 1);
         } else if (entry.isFile() && TARGET_FILES.has(entry.name)) {
-          const type = entry.name as 'package.json' | 'requirements.txt';
+          const type = entry.name as 'package.json' | 'requirements.txt' | 'Cargo.toml' | 'Cargo.lock' | 'go.mod' | 'go.sum' | 'Gemfile.lock';
           results.push({
             path: fullPath,
             type,

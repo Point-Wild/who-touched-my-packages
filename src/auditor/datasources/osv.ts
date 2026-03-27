@@ -58,7 +58,7 @@ export class OSVDataSource extends DataSource {
     const queries: OSVQuery[] = dependencies.map(dep => ({
       package: {
         name: dep.name,
-        ecosystem: dep.ecosystem === 'npm' ? 'npm' : 'PyPI',
+        ecosystem: dep.ecosystem === 'npm' ? 'npm' : dep.ecosystem === 'cargo' ? 'crates.io' : dep.ecosystem === 'go' ? 'Go' : dep.ecosystem === 'ruby' ? 'RubyGems' : 'PyPI',
       },
       version: dep.version !== '*' ? dep.version : undefined,
     }));

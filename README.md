@@ -268,7 +268,7 @@ The tool automatically verifies package provenance to help ensure supply chain s
 **For npm packages:**
 - Queries the npm registry for each package
 - Checks for SLSA provenance attestations in `dist.attestations.provenance`
-- Only packages with `predicateType: "https://slsa.dev/provenance/v1"` are marked as verified
+- Only packages with `predicateType: "https://slsa.dev/provenance/v1"` are marked as enabled
 - Old PGP signatures (`dist.signatures`) are **not** considered provenance
 
 **For PyPI packages:**
@@ -298,7 +298,7 @@ Packages without provenance:
 
 **HTML report:**
 - **Provenance column** in the Dependencies tab showing:
-  - ✓ Verified (green) - Package has SLSA provenance attestations
+  - ✓ Enabled (green) - Package has SLSA provenance attestations
   - ⚠️ Missing (red) - No provenance attestations found
   - Unknown (gray) - Verification failed or package not checked
 - **"No provenance only" filter** to show packages lacking attestations

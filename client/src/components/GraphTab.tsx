@@ -10,7 +10,7 @@ interface GraphNode {
   id: string;
   name: string;
   version: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   file: string;
   isDev?: boolean;
   isVulnerable?: boolean;
