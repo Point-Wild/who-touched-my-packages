@@ -208,6 +208,43 @@ a:hover {
   margin-bottom: 2rem;
 }
 
+.chart-container-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.chart-total {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 1rem;
+  
+}
+.chart-container h3 {
+  font-size: 1.5rem;
+}
+.chart-total h3 {
+    font-family: var(--font-sans);
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 12px;
+    color: var(--accent-blue);
+}
+.chart-total-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(51, 102, 255, 0.2);
+    border: 1px solid rgba(173, 194, 255, 0.35);
+    border-radius: 14px;
+    padding: 3px 9px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: #adc2ff;
+    margin-top: 12px;
+}
+
 .table-container {
   background: var(--bg-secondary);
   border-radius: 12px;
