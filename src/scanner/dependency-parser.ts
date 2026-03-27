@@ -16,6 +16,10 @@ export async function parseDependencies(files: DependencyFile[]): Promise<Depend
         dependencies.push(...parseCargoToml(content, file.path));
       } else if (file.type === 'Cargo.lock') {
         dependencies.push(...parseCargoLock(content, file.path));
+      } else if (file.type === 'go.mod') {
+        dependencies.push(...parseGoMod(content, file.path));
+      } else if (file.type === 'go.sum') {
+        dependencies.push(...parseGoSum(content, file.path));
       }
     } catch (error) {
       // Skip files we can't read
@@ -241,6 +245,116 @@ function parseCargoLock(content: string, filePath: string): Dependency[] {
       isDev: false,
       isPinned: true, // Cargo.lock versions are always pinned
     });
+  }
+  
+  return dependencies;
+}
+
+function parseGoMod(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const lines = content.split('\n');
+  let inRequire = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Check for require block start
+    if (trimmed.startsWith('require (')) {
+      inRequire = true;
+      continue;
+    }
+    
+    // Check for require block end
+    if (inRequire && trimmed === ')') {
+      inRequire = false;
+      continue;
+    }
+    
+    // Single-line require: require package version
+    if (!inRequire && trimmed.startsWith('require ')) {
+      const reqMatch = trimmed.match(/require\s+(\S+)\s+(\S+)/);
+      if (reqMatch) {
+        const name = reqMatch[1];
+        const versionSpec = reqMatch[2];
+        const isIndirect = trimmed.includes('// indirect');
+        
+        dependencies.push({
+          name,
+          version: cleanVersion(versionSpec),
+          versionSpec,
+          ecosystem: 'go',
+          file: filePath,
+          isDev: isIndirect,
+          isPinned: versionSpec.startsWith('v') && !versionSpec.includes('+incompatible') && 
+                    !/v\d+\.\d+\.\d+-/.test(versionSpec),
+        });
+      }
+      continue;
+    }
+    
+    // Inside require block
+    if (inRequire) {
+      // Match: package version [// indirect]
+      const match = trimmed.match(/^(\S+)\s+(\S+)(?:\s*\/\/\s*(indirect|deprecated))?/);
+      if (match) {
+        const name = match[1];
+        const versionSpec = match[2];
+        const isIndirect = trimmed.includes('// indirect');
+        
+        dependencies.push({
+          name,
+          version: cleanVersion(versionSpec),
+          versionSpec,
+          ecosystem: 'go',
+          file: filePath,
+          isDev: isIndirect,
+          isPinned: versionSpec.startsWith('v') && !versionSpec.includes('+incompatible') && 
+                    !/v\d+\.\d+\.\d+-/.test(versionSpec),
+        });
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+function parseGoSum(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const lines = content.split('\n');
+  const seen = new Set<string>();
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    
+    // Parse go.sum line format: package version hash
+    // Format: github.com/pkg/errors v0.9.1 h1:abc123...
+    const match = trimmed.match(/^(\S+)\s+(\S+)\s+h1:/);
+    if (match) {
+      const name = match[1];
+      const version = match[2];
+      const key = `${name}@${version}`;
+      
+      // Avoid duplicates (go.sum lists each dep twice - once with /go.mod suffix)
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      
+      dependencies.push({
+        name,
+        version: cleanVersion(version),
+        versionSpec: version,
+        ecosystem: 'go',
+        file: filePath,
+        isDev: false,
+        isPinned: true, // go.sum versions are always pinned
+      });
+    }
   }
   
   return dependencies;

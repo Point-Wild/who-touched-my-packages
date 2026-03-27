@@ -89,7 +89,7 @@ export interface DependencyNode {
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
   file: string;
   isDev?: boolean;
   dependencies: DependencyNode[];
@@ -108,6 +108,7 @@ const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
 
 const CRATES_REGISTRY_CACHE = new Map<string, any>();
+const GO_PROXY_CACHE = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
@@ -304,6 +305,34 @@ async function fetchCrateFromRegistry(name: string, versionSpec: string): Promis
   }
 }
 
+async function fetchCrateDependencies(name: string, version: string): Promise<any[] | null> {
+  const cacheKey = `deps:${name}@${version}`;
+  if (CRATES_REGISTRY_CACHE.has(cacheKey)) {
+    return CRATES_REGISTRY_CACHE.get(cacheKey);
+  }
+
+  try {
+    const url = `https://crates.io/api/v1/crates/${name}/${version}/dependencies`;
+    const response = await fetch(url, {
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'who-touched-my-deps (security scanner)'
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json() as { dependencies?: any[] };
+    const dependencies = data.dependencies || [];
+    CRATES_REGISTRY_CACHE.set(cacheKey, dependencies);
+    return dependencies;
+  } catch (error) {
+    return null;
+  }
+}
+
 interface CargoDepInfo {
   name: string;
   versionSpec: string;
@@ -414,22 +443,22 @@ async function resolveCargoDependency(
     paths: [[...currentPath, name]],
   };
   
-  // Try to get dependencies from the crate version info
-  if (crate?.versions && depth < MAX_DEPTH - 1) {
-    const targetVersion = crate.versions.find((v: any) => v.num === resolvedVersion) || crate.versions[0];
+  // Fetch dependencies from separate crates.io endpoint
+  if (depth < MAX_DEPTH - 1) {
+    const deps = await fetchCrateDependencies(name, resolvedVersion);
     
-    if (targetVersion?.dependencies) {
-      for (const dep of targetVersion.dependencies) {
+    if (deps) {
+      for (const dep of deps) {
         // Skip optional dependencies and dev-dependencies for tree simplicity
         if (dep.optional || dep.kind === 'dev') continue;
         
         const childNode = await resolveCargoDependency(
-          dep.crate_id,
+          dep.crate_name || dep.crate_id,
           dep.req || '*',
           parentFile,
           dep.kind === 'dev',
           depth + 1,
-          new Set(visited), // Create new set for each branch to allow same dep via different paths
+          new Set(visited),
           [...currentPath, name]
         );
         if (childNode) {
@@ -442,9 +471,190 @@ async function resolveCargoDependency(
   return node;
 }
 
+interface GoDepInfo {
+  name: string;
+  versionSpec: string;
+  isDev?: boolean;
+}
+
+function parseGoModForTree(content: string): GoDepInfo[] {
+  const dependencies: GoDepInfo[] = [];
+  const lines = content.split('\n');
+  let inRequire = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('require (')) {
+      inRequire = true;
+      continue;
+    }
+    
+    if (inRequire && trimmed === ')') {
+      inRequire = false;
+      continue;
+    }
+    
+    if (!inRequire && trimmed.startsWith('require ')) {
+      const reqMatch = trimmed.match(/require\s+(\S+)\s+(\S+)/);
+      if (reqMatch) {
+        dependencies.push({
+          name: reqMatch[1],
+          versionSpec: reqMatch[2],
+          isDev: trimmed.includes('// indirect'),
+        });
+      }
+      continue;
+    }
+    
+    if (inRequire) {
+      const match = trimmed.match(/^(\S+)\s+(\S+)/);
+      if (match) {
+        dependencies.push({
+          name: match[1],
+          versionSpec: match[2],
+          isDev: trimmed.includes('// indirect'),
+        });
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+async function fetchGoModuleFromProxy(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (GO_PROXY_CACHE.has(cacheKey)) {
+    return GO_PROXY_CACHE.get(cacheKey);
+  }
+
+  try {
+    // Go module proxy URL format
+    const encodedName = name.replace(/\//g, '%2F');
+    const version = versionSpec.replace(/^[>=<~!^]+/, '').replace(/^v/, '') || 'latest';
+    const url = `https://proxy.golang.org/${encodedName}/@v/v${version}.info`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      // Try without v prefix
+      const urlNoV = `https://proxy.golang.org/${encodedName}/@v/${version}.info`;
+      const responseNoV = await fetch(urlNoV, {
+        headers: { 'Accept': 'application/json' },
+      });
+      
+      if (!responseNoV.ok) {
+        return null;
+      }
+      
+      const data = await responseNoV.json();
+      GO_PROXY_CACHE.set(cacheKey, data);
+      return data;
+    }
+
+    const data = await response.json();
+    GO_PROXY_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function resolveGoDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  // Fetch from Go module proxy
+  const module = await fetchGoModuleFromProxy(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '').replace(/^v/, '') || 'latest';
+  
+  if (module?.Version) {
+    resolvedVersion = module.Version.replace(/^v/, '');
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'go',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  // Fetch transitive dependencies from the module's go.mod
+  if (depth < MAX_DEPTH - 1) {
+    const goModContent = await fetchGoModFromProxy(name, resolvedVersion);
+    if (goModContent) {
+      const transitiveDeps = parseGoModForTree(goModContent);
+      
+      for (const dep of transitiveDeps) {
+        // Skip indirect dependencies to reduce noise
+        if (dep.isDev) continue;
+        
+        const childNode = await resolveGoDependency(
+          dep.name,
+          dep.versionSpec,
+          parentFile,
+          dep.isDev || false,
+          depth + 1,
+          new Set(visited),
+          [...currentPath, name]
+        );
+        if (childNode) {
+          node.dependencies.push(childNode);
+        }
+      }
+    }
+  }
+  
+  return node;
+}
+
+async function fetchGoModFromProxy(name: string, version: string): Promise<string | null> {
+  try {
+    const encodedName = name.replace(/\//g, '%2F');
+    const cleanVersion = version.replace(/^v/, '');
+    // Try to fetch go.mod from the module proxy
+    const url = `https://proxy.golang.org/${encodedName}/@v/v${cleanVersion}.mod`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      // Try without v prefix
+      const urlNoV = `https://proxy.golang.org/${encodedName}/@v/${cleanVersion}.mod`;
+      const responseNoV = await fetch(urlNoV);
+      if (!responseNoV.ok) {
+        return null;
+      }
+      return await responseNoV.text();
+    }
+    return await response.text();
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function buildDependencyTree(
   rootFile: string,
-  ecosystem: 'npm' | 'pypi' | 'cargo'
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go'
 ): Promise<DependencyTree> {
   const tree: DependencyTree = {
     roots: [],
@@ -566,6 +776,32 @@ export async function buildDependencyTree(
       console.error(`Failed to parse ${rootFile}:`, error);
     }
   }
+
+  if (ecosystem === 'go') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const visited = new Set<string>();
+      const dependencies = parseGoModForTree(content);
+      
+      for (const dep of dependencies) {
+        const node = await resolveGoDependency(
+          dep.name,
+          dep.versionSpec,
+          rootFile,
+          dep.isDev || false,
+          0,
+          visited,
+          []
+        );
+        if (node) {
+          tree.roots.push(node);
+          collectNodesAndEdges(node, tree, null, dep.isDev ? 'dev' : 'dependency');
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
   
   return tree;
 }
@@ -608,7 +844,7 @@ export function flattenDependencyTree(tree: DependencyTree): Array<{
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
   file: string;
   isDev?: boolean;
   depth: number;

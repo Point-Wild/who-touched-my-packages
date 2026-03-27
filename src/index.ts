@@ -14,7 +14,7 @@ import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency
 import { findDependencyFiles } from './scanner/file-finder.js';
 import { detectLanguages } from './scanner/language-detector.js';
 import type { Dependency, DependencyEdge } from './scanner/types.js';
-import { analyzeSupplyChain, DEFAULT_MODEL, DEFAULT_CONCURRENCY, type SupplyChainReport } from './supply-chain/index.js';
+import { analyzeSupplyChain, DEFAULT_CONCURRENCY, DEFAULT_MODEL, type SupplyChainReport } from './supply-chain/index.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -171,6 +171,8 @@ async function main() {
 
     const npmFiles = files.filter(f => f.type === 'package.json');
     const pythonFiles = files.filter(f => f.type === 'requirements.txt');
+    const cargoFiles = files.filter(f => f.type === 'Cargo.toml');
+    const goFiles = files.filter(f => f.type === 'go.mod');
     const allTreeNodes = new Map<string, Dependency>();
 
     for (const file of npmFiles) {
@@ -205,6 +207,56 @@ async function main() {
         if (!allTreeNodes.has(key)) {
           allTreeNodes.set(key, dep);
         }
+      }
+    }
+
+    // Include Rust/Cargo dependencies in the graph
+    for (const file of cargoFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'cargo');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+
+    // Include Go dependencies in the graph
+    for (const file of goFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'go');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+      } catch (error) {
+        // Skip files that fail to parse
       }
     }
 
