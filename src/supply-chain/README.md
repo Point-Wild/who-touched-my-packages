@@ -101,23 +101,39 @@ The programmatic triage scans for these pattern families:
 import { analyzeSupplyChain } from './supply-chain';
 
 const result = await analyzeSupplyChain(dependencies, {
-  apiKey: 'sk-...',          // or set THREATPOINT_API_KEY env var
-  model: 'claude-sonnet-4-5-20241022', // default
-  provider: 'anthropic',     // 'anthropic' | 'openai' | 'openrouter'
-  concurrency: 3,            // parallel package analyses
+  model: 'claude-sonnet-4-5-20250514',  // default — see models.ts for known-good models
+  provider: 'anthropic',                // optional — auto-detected from model name (anthropic, openai, gemini, openrouter)
+  concurrency: 3,                       // parallel package analyses
 });
 
 console.log(result.summary);
 // { total: 5, critical: 1, high: 2, medium: 1, low: 1, byCategory: { ... } }
 ```
 
+### Provider Auto-Detection
+
+When `--llm-provider` is omitted, the provider is inferred from the model name:
+
+| Model pattern | Inferred provider |
+|---------------|-------------------|
+| `claude-*` | `anthropic` |
+| `gpt-*`, `o1-*`, `o3-*` | `openai` |
+| `gemini-*` or `google/*` | `gemini` (direct Google API) |
+| Contains `/` (other) | `openrouter` |
+| Anything else | Falls back to `anthropic` |
+
+This means `--supply-chain-model gpt-5.3-codex` automatically selects the OpenAI provider — no need to also pass `--llm-provider openai`.
+
 ### API Key Resolution
 
 The API key is resolved in order:
 
-1. `options.apiKey` parameter
-2. `THREATPOINT_API_KEY` environment variable
-3. `~/.threatpoint` file (first line)
+1. `options.apiKey` parameter passed directly
+2. Provider-specific environment variable:
+   - **Anthropic**: `ANTHROPIC_API_KEY`
+   - **OpenAI**: `OPENAI_API_KEY`
+   - **Gemini**: `GOOGLE_API_KEY`
+   - **OpenRouter**: `OPENROUTER_API_KEY`
 
 ### Progress Callback
 
@@ -188,8 +204,22 @@ supply-chain/
 
 ## LLM Providers
 
-| Provider | Model Examples | Config |
-|----------|---------------|--------|
-| Anthropic (default) | `claude-sonnet-4-5-20241022` | Direct API, maxTokens=8192 |
-| OpenAI | `gpt-4o` | Standard OpenAI API |
-| OpenRouter | Any supported model | Custom baseURL routing |
+| Provider | Env Var | Model Examples | Config |
+|----------|---------|---------------|--------|
+| **Anthropic** (default) | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5-20250514`, `claude-haiku-4-5-20251001`, `claude-opus-4-20250514` | Direct API, maxTokens=8192, temperature=0 |
+| **OpenAI** | `OPENAI_API_KEY` | `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`, `o3`, `o4-mini` | Standard OpenAI API, maxTokens=8192, temperature=0 |
+| **Gemini** | `GOOGLE_API_KEY` | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-3.1-pro-preview` | Direct Google GenAI API, maxOutputTokens=8192, temperature=0 |
+| **OpenRouter** | `OPENROUTER_API_KEY` | `anthropic/claude-sonnet-4-5`, `openai/gpt-5.3-codex`, `google/gemini-2.5-pro` | Custom baseURL routing, maxTokens=8192, temperature=0 |
+
+All known-good models and provider configurations are defined in [`llm/models.ts`](llm/models.ts). Unrecognized model names produce a warning but are still sent to the provider.
+
+### Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `ANTHROPIC_API_KEY` | API key for Anthropic provider | Required when using Anthropic |
+| `OPENAI_API_KEY` | API key for OpenAI provider | Required when using OpenAI |
+| `GOOGLE_API_KEY` | API key for Google Gemini provider | Required when using Gemini directly |
+| `OPENROUTER_API_KEY` | API key for OpenRouter provider | Required when using OpenRouter |
+| `SC_VERBOSE` | Set to `1` for detailed triage scores, per-file analysis progress, and tool call traces | `0` |
+| `SC_MAX_LLM_FILES` | Maximum files per package sent to the LLM for analysis | `30` |
