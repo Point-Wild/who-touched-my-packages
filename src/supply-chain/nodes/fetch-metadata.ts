@@ -1,5 +1,7 @@
 import type { Dependency } from '../../scanner/types.js';
 import type { PackageMetadata, PackageSource } from '../types.js';
+import { fetchCratesMetadata, fetchCratesSource } from '../registry/crates.js';
+import { fetchGoMetadata, fetchGoSource } from '../registry/golang.js';
 import { fetchNpmMetadata, fetchNpmSource } from '../registry/npm.js';
 import { fetchPypiMetadata, fetchPypiSource } from '../registry/pypi.js';
 import { pMap, depKey } from '../utils.js';
@@ -52,7 +54,11 @@ export async function fetchMetadataNode(
         // source fetcher (needed for version-diff computation in npm).
         const meta = dep.ecosystem === 'npm'
           ? await fetchNpmMetadata(dep.name)
-          : await fetchPypiMetadata(dep.name);
+          : dep.ecosystem === 'pypi'
+            ? await fetchPypiMetadata(dep.name)
+            : dep.ecosystem === 'cratesio'
+              ? await fetchCratesMetadata(dep.name)
+              : await fetchGoMetadata(dep.name);
 
         if (meta) {
           metadata.set(key, meta);
@@ -60,7 +66,11 @@ export async function fetchMetadataNode(
           // For npm, pass the previous version so fetchNpmSource can diff tarballs.
           const source = dep.ecosystem === 'npm'
             ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
-            : await fetchPypiSource(dep.name, dep.version);
+            : dep.ecosystem === 'pypi'
+              ? await fetchPypiSource(dep.name, dep.version)
+              : dep.ecosystem === 'cratesio'
+                ? await fetchCratesSource(dep.name, dep.version)
+                : await fetchGoSource(dep.name, dep.version);
 
           if (source) sources.set(key, source);
         }

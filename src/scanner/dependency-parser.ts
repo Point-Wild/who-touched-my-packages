@@ -108,6 +108,134 @@ function parseRequirementsTxt(content: string, filePath: string): Dependency[] {
   return dependencies;
 }
 
+function parseCargoToml(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const sectionNames = new Set([
+    'dependencies',
+    'dev-dependencies',
+    'build-dependencies',
+    'workspace.dependencies',
+    'target',
+  ]);
+
+  let currentSection = '';
+  let currentTargetDependencySection = false;
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+
+    const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1];
+      currentTargetDependencySection =
+        currentSection.startsWith('target.') && currentSection.endsWith('.dependencies');
+      continue;
+    }
+
+    const isDependencySection =
+      sectionNames.has(currentSection) ||
+      currentSection.endsWith('.dependencies') ||
+      currentTargetDependencySection;
+
+    if (!isDependencySection) {
+      continue;
+    }
+
+    const inlineMatch = rawLine.match(/^\s*([A-Za-z0-9_.-]+)\s*=\s*["']([^"']+)["']/);
+    if (inlineMatch) {
+      const [, name, versionSpec] = inlineMatch;
+      dependencies.push({
+        name,
+        version: cleanVersion(versionSpec),
+        versionSpec,
+        ecosystem: 'cratesio',
+        file: filePath,
+        isDev: currentSection.includes('dev-dependencies'),
+      });
+      continue;
+    }
+
+    const tableMatch = rawLine.match(/^\s*([A-Za-z0-9_.-]+)\s*=\s*\{(.+)\}\s*$/);
+    if (!tableMatch) {
+      continue;
+    }
+
+    const [, name, tableBody] = tableMatch;
+    const versionMatch = tableBody.match(/version\s*=\s*["']([^"']+)["']/);
+    const pathOnly = /\bpath\s*=/.test(tableBody) && !versionMatch;
+    const gitOnly = /\bgit\s*=/.test(tableBody) && !versionMatch;
+
+    if (pathOnly || gitOnly || !versionMatch) {
+      continue;
+    }
+
+    const versionSpec = versionMatch[1];
+    dependencies.push({
+      name,
+      version: cleanVersion(versionSpec),
+      versionSpec,
+      ecosystem: 'cratesio',
+      file: filePath,
+      isDev: currentSection.includes('dev-dependencies'),
+    });
+  }
+
+  return dependencies;
+}
+
+function parseGoMod(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  let inRequireBlock = false;
+
+  for (const rawLine of content.split('\n')) {
+    const commentStripped = rawLine.replace(/\/\/.*$/, '').trim();
+
+    if (!commentStripped) {
+      continue;
+    }
+
+    if (commentStripped === 'require (') {
+      inRequireBlock = true;
+      continue;
+    }
+
+    if (inRequireBlock && commentStripped === ')') {
+      inRequireBlock = false;
+      continue;
+    }
+
+    const requireLine = inRequireBlock
+      ? commentStripped
+      : commentStripped.startsWith('require ')
+        ? commentStripped.slice('require '.length).trim()
+        : null;
+
+    if (!requireLine) {
+      continue;
+    }
+
+    const match = requireLine.match(/^(\S+)\s+(\S+)$/);
+    if (!match) {
+      continue;
+    }
+
+    const [, name, versionSpec] = match;
+    dependencies.push({
+      name,
+      version: versionSpec.trim(),
+      versionSpec,
+      ecosystem: 'golang',
+      file: filePath,
+    });
+  }
+
+  return dependencies;
+}
+
 function cleanVersion(version: string): string {
   // Remove common prefixes and operators
   return version

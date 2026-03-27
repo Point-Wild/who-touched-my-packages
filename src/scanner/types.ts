@@ -8,7 +8,7 @@ export interface Dependency {
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang' | 'ruby';
   file: string;
   isDev?: boolean;
   isPinned?: boolean;

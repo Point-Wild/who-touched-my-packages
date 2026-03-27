@@ -45,7 +45,7 @@ export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export interface SupplyChainFinding {
   packageName: string;
   packageVersion: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang';
   category: ThreatCategory;
   severity: Severity;
   confidence: number;
@@ -86,7 +86,7 @@ export interface SupplyChainOptions {
 
 export interface PackageMetadata {
   name: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang';
   latestVersion: string;
   /** The version published immediately before latestVersion (npm only). Used to compute version diffs. */
   previousVersion?: string;
@@ -105,7 +105,7 @@ export interface PackageMetadata {
 
 export interface PackageSource {
   name: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang';
   version: string;
   /** Entry point file content (index.js, __init__.py, etc.) */
   entryPoint?: string;

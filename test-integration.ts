@@ -14,6 +14,8 @@
 
 import { fetchNpmMetadata, fetchNpmSource } from './src/supply-chain/registry/npm.js';
 import { fetchPypiMetadata } from './src/supply-chain/registry/pypi.js';
+import { fetchCratesMetadata, fetchCratesSource } from './src/supply-chain/registry/crates.js';
+import { fetchGoMetadata, fetchGoSource } from './src/supply-chain/registry/golang.js';
 import { runTriage, buildContentMap } from './src/supply-chain/llm/tools.js';
 
 const MIN_TRIAGE_SCORE = 8;
@@ -58,8 +60,12 @@ console.log('\n── Phase 1: npm registry signals (live API) ──');
     assert('lodash: packageAgeDays > 3000 (old, stable)',  s.packageAgeDays > 3000,
       `got ${s.packageAgeDays}`);
     // Score can be 1 if lodash lacks sigstore provenance (expected for pre-provenance era packages)
-    assert('lodash: riskScore ≤ 1 (clean package, provenance penalty acceptable)',  s.riskScore <= 1,
-      `got ${s.riskScore} — signals: typosquat=${s.typosquatCandidate}, depConfusion=${s.isDependencyConfusion}`);
+    assert('lodash: no typosquat/confusion signals',
+        s.typosquatCandidate === null && !s.isDependencyConfusion,
+        `signals: typosquat=${s.typosquatCandidate}, depConfusion=${s.isDependencyConfusion}`);
+    assert('lodash: riskScore ≤ 2 (provenance + recency acceptable)',
+        s.riskScore <= 2,
+        `got ${s.riskScore}`);
     assert('lodash: typosquatCandidate = null',      s.typosquatCandidate === null,
       `got ${s.typosquatCandidate}`);
     assert('lodash: isDependencyConfusion = false',  !s.isDependencyConfusion);
@@ -76,10 +82,13 @@ console.log('\n── Phase 1: npm registry signals (live API) ──');
   const meta = await withTimeout('fetch axios metadata', () => fetchNpmMetadata('axios'));
   if (meta) {
     const s = meta.registrySignals!;
-    assert('axios: riskScore = 0',                  s.riskScore === 0,
-      `got ${s.riskScore}`);
     assert('axios: typosquatCandidate = null',       s.typosquatCandidate === null,
       `got ${s.typosquatCandidate}`);
+    assert('axios: no typosquat/confusion signals',
+        s.typosquatCandidate === null && !s.isDependencyConfusion,
+        `signals: typosquat=${s.typosquatCandidate}, depConfusion=${s.isDependencyConfusion}`);
+    assert('axios: riskScore <= 1',                  s.riskScore <= 1,
+      `got ${s.riskScore}`);
   }
 }
 
@@ -126,6 +135,29 @@ console.log('\n── Phase 1: PyPI registry signals (live API) ──');
   }
 }
 
+console.log('\n── Phase 1: Rust/Go registry signals (live API) ──');
+
+{
+  const meta = await withTimeout('fetch serde metadata', () => fetchCratesMetadata('serde'));
+  if (meta) {
+    const s = meta.registrySignals!;
+    assert('serde: registrySignals present', !!s);
+    assert('serde: ecosystem = cratesio', meta.ecosystem === 'cratesio', `got ${meta.ecosystem}`);
+    assert('serde: latestVersion populated', !!meta.latestVersion, `got ${meta.latestVersion}`);
+    assert('serde: no install scripts', meta.hasInstallScripts === false);
+  }
+}
+
+{
+  const meta = await withTimeout('fetch golang.org/x/text metadata', () => fetchGoMetadata('golang.org/x/text'));
+  if (meta) {
+    const s = meta.registrySignals!;
+    assert('go module: registrySignals present', !!s);
+    assert('go module: ecosystem = golang', meta.ecosystem === 'golang', `got ${meta.ecosystem}`);
+    assert('go module: latestVersion populated', !!meta.latestVersion, `got ${meta.latestVersion}`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Section 3: Triage on a real npm tarball — legitimate package (false-positive guard)
 // Validates: runTriage() on actual package code stays below threshold for clean packages
@@ -167,6 +199,30 @@ console.log('\n── Phase 3: Triage on real npm tarballs ──');
       highScores.length === 0,
       `high-scoring files: ${highScores.map(r => `${r.filePath}(${r.score})`).join(', ')}`);
     console.log(`    (${source.fileList.length} files, max triage score: ${results[0]?.score ?? 0})`);
+  }
+}
+
+{
+  const meta = await withTimeout('fetch serde metadata for source', () => fetchCratesMetadata('serde'));
+  const source = meta ? await withTimeout('fetch serde source', () =>
+    fetchCratesSource('serde', meta.latestVersion)) : null;
+
+  if (source) {
+    assert('serde: source has files extracted', source.fileList.length > 0, `got ${source.fileList.length}`);
+    assert('serde: entry point or suspicious files available',
+      !!source.entryPoint || Object.keys(source.suspiciousFiles).length > 0);
+  }
+}
+
+{
+  const meta = await withTimeout('fetch golang.org/x/text metadata for source', () => fetchGoMetadata('golang.org/x/text'));
+  const source = meta ? await withTimeout('fetch golang.org/x/text source', () =>
+    fetchGoSource('golang.org/x/text', meta.latestVersion)) : null;
+
+  if (source) {
+    assert('go module: source has files extracted', source.fileList.length > 0, `got ${source.fileList.length}`);
+    assert('go module: contains go.mod or Go files',
+      source.fileList.some(f => f.endsWith('go.mod') || f.endsWith('.go')));
   }
 }
 

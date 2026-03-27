@@ -12,7 +12,7 @@ function log(...args: unknown[]) {
 export interface VerificationResult {
   packageName: string;
   version: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang';
   hasProvenance: boolean;
   provenanceUrl?: string;
   error?: string;

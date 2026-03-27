@@ -172,7 +172,7 @@ async function main() {
 
     const npmFiles = files.filter(f => f.type === 'package.json');
     const pythonFiles = files.filter(f => f.type === 'requirements.txt');
-    const cargoFiles = files.filter(f => f.type === 'Cargo.toml');
+    const rustFiles = files.filter(f => f.type === 'Cargo.toml');
     const goFiles = files.filter(f => f.type === 'go.mod');
     const rubyFiles = files.filter(f => f.type === 'Gemfile.lock');
     const allTreeNodes = new Map<string, Dependency>();
@@ -214,7 +214,7 @@ async function main() {
     }
 
     // Include Rust/Cargo dependencies in the graph
-    for (const file of cargoFiles) {
+    for (const file of rustFiles) {
       try {
         const tree = await buildDependencyTree(file.path, 'cargo');
         const flatDeps = flattenDependencyTree(tree);
