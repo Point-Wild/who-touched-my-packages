@@ -75,7 +75,6 @@ export function GraphView({ nodes, edges, onNodeClick, fitViewSignal }: GraphVie
                     minZoom={0.1}
                     maxZoom={1.5}
                 >
-                    <FitViewEffect signal={fitViewSignal} />
                     <Background gap={16} color="var(--border-color)" />
                     <Controls />
                 </ReactFlow>
