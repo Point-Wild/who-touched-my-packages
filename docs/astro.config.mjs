@@ -26,6 +26,24 @@ export default defineConfig({
             ],
             title: 'Who Touched My Packages?',
             description: 'A beautiful CLI tool for auditing dependencies and finding vulnerabilities',
+            head: [
+                {
+                    tag: 'script',
+                    attrs: {
+                        async: true,
+                        src: 'https://www.googletagmanager.com/gtag/js?id=G-Q4J4Z1W7H7'
+                    }
+                },
+                {
+                    tag: 'script',
+                    content: `
+                        window.dataLayer = window.dataLayer || [];
+                        function gtag(){dataLayer.push(arguments);}
+                        gtag('js', new Date());
+                        gtag('config', 'G-Q4J4Z1W7H7');
+                    `
+                }
+            ],
             social: [
                 { label: 'GitHub', href: 'https://github.com/point-wild/who-touched-my-packages', icon: 'github' },
             ],
