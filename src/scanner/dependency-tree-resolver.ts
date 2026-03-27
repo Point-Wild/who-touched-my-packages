@@ -89,7 +89,7 @@ export interface DependencyNode {
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   file: string;
   isDev?: boolean;
   dependencies: DependencyNode[];
@@ -109,6 +109,7 @@ const resolvedCache = new Map<string, any>();
 
 const CRATES_REGISTRY_CACHE = new Map<string, any>();
 const GO_PROXY_CACHE = new Map<string, any>();
+const RUBYGEMS_CACHE = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
@@ -652,9 +653,143 @@ async function fetchGoModFromProxy(name: string, version: string): Promise<strin
   }
 }
 
+interface RubyDepInfo {
+  name: string;
+  versionSpec: string;
+  isDev?: boolean;
+}
+
+function parseGemfileLockForTree(content: string): RubyDepInfo[] {
+  const dependencies: RubyDepInfo[] = [];
+  const lines = content.split('\n');
+  let inSpecsSection = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    if (trimmed === 'GEM') {
+      continue;
+    }
+    
+    if (trimmed === 'specs:') {
+      inSpecsSection = true;
+      continue;
+    }
+    
+    if (trimmed === 'DEPENDENCIES' || trimmed.startsWith('DEPENDENCIES')) {
+      inSpecsSection = false;
+      continue;
+    }
+    
+    if (inSpecsSection && (trimmed === '' || trimmed.startsWith('PLATFORMS') || trimmed.startsWith('BUNDLED WITH'))) {
+      inSpecsSection = false;
+      continue;
+    }
+    
+    if (inSpecsSection) {
+      const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*\(([0-9][^)]*)\)/);
+      if (match) {
+        dependencies.push({
+          name: match[1],
+          versionSpec: match[2],
+          isDev: false,
+        });
+      }
+    }
+  }
+  
+  return dependencies;
+}
+
+async function fetchGemFromRubygems(name: string, versionSpec: string): Promise<any | null> {
+  const cacheKey = `${name}@${versionSpec}`;
+  if (RUBYGEMS_CACHE.has(cacheKey)) {
+    return RUBYGEMS_CACHE.get(cacheKey);
+  }
+
+  try {
+    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    const url = normalizedVersion === 'latest'
+      ? `https://rubygems.org/api/v1/gems/${name}.json`
+      : `https://rubygems.org/api/v2/rubygems/${name}/versions/${normalizedVersion}.json`;
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    RUBYGEMS_CACHE.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function resolveRubyDependency(
+  name: string,
+  versionSpec: string,
+  parentFile: string,
+  isDev: boolean,
+  depth: number,
+  visited: Set<string>,
+  currentPath: string[]
+): Promise<DependencyNode | null> {
+  if (depth >= MAX_DEPTH) return null;
+  
+  const nodeKey = `${name}@${versionSpec}`;
+  if (visited.has(nodeKey)) {
+    return null;
+  }
+  
+  visited.add(nodeKey);
+  
+  const gem = await fetchGemFromRubygems(name, versionSpec);
+  let resolvedVersion = versionSpec.replace(/^[>=<~!^]+/, '').trim() || 'latest';
+  
+  if (gem?.version) {
+    resolvedVersion = gem.version;
+  }
+  
+  const node: DependencyNode = {
+    name,
+    version: resolvedVersion,
+    versionSpec,
+    ecosystem: 'ruby',
+    file: parentFile,
+    isDev,
+    dependencies: [],
+    depth,
+    paths: [[...currentPath, name]],
+  };
+  
+  if (depth < MAX_DEPTH - 1 && gem?.dependencies) {
+    for (const dep of gem.dependencies.runtime || []) {
+      const childNode = await resolveRubyDependency(
+        dep.name,
+        dep.requirements || '*',
+        parentFile,
+        false,
+        depth + 1,
+        new Set(visited),
+        [...currentPath, name]
+      );
+      if (childNode) {
+        node.dependencies.push(childNode);
+      }
+    }
+  }
+  
+  return node;
+}
+
 export async function buildDependencyTree(
   rootFile: string,
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go'
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby'
 ): Promise<DependencyTree> {
   const tree: DependencyTree = {
     roots: [],
@@ -803,6 +938,32 @@ export async function buildDependencyTree(
     }
   }
   
+  if (ecosystem === 'ruby') {
+    try {
+      const content = await readFile(rootFile, 'utf-8');
+      const visited = new Set<string>();
+      const dependencies = parseGemfileLockForTree(content);
+      
+      for (const dep of dependencies) {
+        const node = await resolveRubyDependency(
+          dep.name,
+          dep.versionSpec,
+          rootFile,
+          dep.isDev || false,
+          0,
+          visited,
+          []
+        );
+        if (node) {
+          tree.roots.push(node);
+          collectNodesAndEdges(node, tree, null, dep.isDev ? 'dev' : 'dependency');
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to parse ${rootFile}:`, error);
+    }
+  }
+  
   return tree;
 }
 
@@ -844,7 +1005,7 @@ export function flattenDependencyTree(tree: DependencyTree): Array<{
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   file: string;
   isDev?: boolean;
   depth: number;

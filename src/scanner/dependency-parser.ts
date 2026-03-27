@@ -20,6 +20,8 @@ export async function parseDependencies(files: DependencyFile[]): Promise<Depend
         dependencies.push(...parseGoMod(content, file.path));
       } else if (file.type === 'go.sum') {
         dependencies.push(...parseGoSum(content, file.path));
+      } else if (file.type === 'Gemfile.lock') {
+        dependencies.push(...parseGemfileLock(content, file.path));
       }
     } catch (error) {
       // Skip files we can't read
@@ -354,6 +356,60 @@ function parseGoSum(content: string, filePath: string): Dependency[] {
         isDev: false,
         isPinned: true, // go.sum versions are always pinned
       });
+    }
+  }
+  
+  return dependencies;
+}
+
+function parseGemfileLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const lines = content.split('\n');
+  let inSpecsSection = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    // Check for section headers
+    if (trimmed === 'GEM') {
+      continue;
+    }
+    
+    if (trimmed === 'specs:') {
+      inSpecsSection = true;
+      continue;
+    }
+    
+    if (trimmed === 'DEPENDENCIES' || trimmed.startsWith('DEPENDENCIES')) {
+      inSpecsSection = false;
+      continue;
+    }
+    
+    // End of specs section
+    if (inSpecsSection && (trimmed === '' || trimmed.startsWith('PLATFORMS') || trimmed.startsWith('BUNDLED WITH'))) {
+      inSpecsSection = false;
+      continue;
+    }
+    
+    // Parse gem specs
+    if (inSpecsSection) {
+      // Parse format:    gem_name (version)
+      const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*\(([0-9][^)]*)\)/);
+      if (match) {
+        const name = match[1];
+        const version = match[2];
+        
+        dependencies.push({
+          name,
+          version: cleanVersion(version),
+          versionSpec: version,
+          ecosystem: 'ruby',
+          file: filePath,
+          isDev: false,
+          isPinned: true,
+        });
+      }
     }
   }
   

@@ -77,7 +77,7 @@ Packages without provenance:
 
 The Dependencies tab includes a **Provenance** column showing:
 
-- **✓ Verified** (green) - Package has SLSA provenance attestations
+- **✓ Enabled** (green) - Package has SLSA provenance attestations
 - **⚠️ Missing** (red) - No provenance attestations found
 - **Unknown** (gray) - Verification failed or package not checked
 
@@ -86,7 +86,7 @@ You can filter the table using the **"No provenance only"** checkbox to focus on
 ### CSV Export
 
 When exporting dependencies to CSV, the provenance status is included as a column with values:
-- `Verified`
+- `Enabled`
 - `Missing`
 - `Unknown`
 

@@ -1,6 +1,6 @@
 export interface DependencyFile {
   path: string;
-  type: 'package.json' | 'requirements.txt' | 'Cargo.toml' | 'Cargo.lock' | 'go.mod' | 'go.sum';
+  type: 'package.json' | 'requirements.txt' | 'Cargo.toml' | 'Cargo.lock' | 'go.mod' | 'go.sum' | 'Gemfile.lock';
   relativePath: string;
 }
 
@@ -8,7 +8,7 @@ export interface Dependency {
   name: string;
   version: string;
   versionSpec: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   file: string;
   isDev?: boolean;
   isPinned?: boolean;

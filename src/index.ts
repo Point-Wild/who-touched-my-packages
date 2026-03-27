@@ -173,6 +173,7 @@ async function main() {
     const pythonFiles = files.filter(f => f.type === 'requirements.txt');
     const cargoFiles = files.filter(f => f.type === 'Cargo.toml');
     const goFiles = files.filter(f => f.type === 'go.mod');
+    const rubyFiles = files.filter(f => f.type === 'Gemfile.lock');
     const allTreeNodes = new Map<string, Dependency>();
 
     for (const file of npmFiles) {
@@ -239,6 +240,31 @@ async function main() {
     for (const file of goFiles) {
       try {
         const tree = await buildDependencyTree(file.path, 'go');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+
+    // Include Ruby dependencies in the graph
+    for (const file of rubyFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'ruby');
         const flatDeps = flattenDependencyTree(tree);
 
         flatDeps.forEach(dep => {
