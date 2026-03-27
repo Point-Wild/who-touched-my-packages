@@ -9,9 +9,11 @@
         "@clack/prompts": "1.1.0",
         "@langchain/anthropic": "1.3.25",
         "@langchain/core": "1.1.36",
-        "@langchain/google-genai": "^2.1.26",
+        "@langchain/google-genai": "2.1.26",
         "@langchain/langgraph": "1.2.5",
         "@langchain/openai": "1.3.1",
+        "ag-charts-community": "^13.2.0",
+        "ag-charts-react": "^13.2.0",
         "commander": "11.1.0",
         "open": "10.1.0",
         "ora": "8.2.0",
@@ -265,6 +267,16 @@
     "@xyflow/react": ["@xyflow/react@12.10.1", "", { "dependencies": { "@xyflow/system": "0.0.75", "classcat": "^5.0.3", "zustand": "^4.4.0" }, "peerDependencies": { "react": ">=17", "react-dom": ">=17" } }, "sha512-5eSWtIK/+rkldOuFbOOz44CRgQRjtS9v5nufk77DV+XBnfCGL9HAQ8PG00o2ZYKqkEU/Ak6wrKC95Tu+2zuK3Q=="],
 
     "@xyflow/system": ["@xyflow/system@0.0.75", "", { "dependencies": { "@types/d3-drag": "^3.0.7", "@types/d3-interpolate": "^3.0.4", "@types/d3-selection": "^3.0.10", "@types/d3-transition": "^3.0.8", "@types/d3-zoom": "^3.0.8", "d3-drag": "^3.0.0", "d3-interpolate": "^3.0.1", "d3-selection": "^3.0.0", "d3-zoom": "^3.0.0" } }, "sha512-iXs+AGFLi8w/VlAoc/iSxk+CxfT6o64Uw/k0CKASOPqjqz6E0rb5jFZgJtXGZCpfQI6OQpu5EnumP5fGxQheaQ=="],
+
+    "ag-charts-community": ["ag-charts-community@13.2.0", "", { "dependencies": { "ag-charts-core": "13.2.0", "ag-charts-locale": "13.2.0", "ag-charts-types": "13.2.0" } }, "sha512-l6m9vpDj99zzDJjZJTbQ0egz7yS+am/lk94WHT9ZAyl9F2Z+iLpbubRtvK/+sfqQwRX77UpdfPvS8Yd0Fv01mw=="],
+
+    "ag-charts-core": ["ag-charts-core@13.2.0", "", { "dependencies": { "ag-charts-types": "13.2.0" } }, "sha512-wZwyd9rqCJh7IvKqtsTieg36+04tMBshqrkE4xxzb7QfSKPw9cnTKj59Fv43KlrUkpIExaxKdAAG3KUyk93Nzg=="],
+
+    "ag-charts-locale": ["ag-charts-locale@13.2.0", "", {}, "sha512-3keMSjAMskIPQ67OkYL58HVBJI+YwbD0qXJaKtfeyE2aI0pPuDXO/jM6WlFJEoPodkVtcEPO9vKu8Vo/S/1vPg=="],
+
+    "ag-charts-react": ["ag-charts-react@13.2.0", "", { "dependencies": { "ag-charts-community": "13.2.0" }, "peerDependencies": { "react": "^18.0.0 || ^19.0.0" } }, "sha512-W4fivwOVS70/bSJcLd0ZCir/hZBReoFEWeh9XfH1zV9iWj8CpDB1O6fHO5sTSj2vqNkwWqr1D5yO4+97uURNDg=="],
+
+    "ag-charts-types": ["ag-charts-types@13.2.0", "", {}, "sha512-O9TTqZmKwLpjylaxxfKqiQ3reWplCSkyB0yG/cRYKxyyIPxEIh312E/aFn63F0rqdY+yYvz/7xe4rmF6clL1gw=="],
 
     "ansi-regex": ["ansi-regex@6.2.2", "", {}, "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg=="],
 
