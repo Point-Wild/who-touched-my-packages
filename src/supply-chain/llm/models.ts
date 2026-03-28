@@ -21,9 +21,9 @@ export const PROVIDERS: Record<LLMProvider, ProviderConfig> = {
     name: 'Anthropic',
     envVar: 'ANTHROPIC_API_KEY',
     models: [
-      'claude-sonnet-4-5-20250514',
+      'claude-sonnet-4-6',
       'claude-haiku-4-5-20251001',
-      'claude-opus-4-20250514',
+      'claude-opus-4-6',
     ],
   },
   openai: {

@@ -36,6 +36,7 @@ export class Reporter {
     supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport,
     repositoryUrl?: string
   ): void {
+
     if (this.options.json) {
       this.reportJson(result);
       return;
@@ -237,6 +238,7 @@ export class Reporter {
     dependencyEdges?: DependencyEdge[],
     supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport
   ): Promise<{ url: string; close: () => void }> {
+
     const reportData: ReportData = {
       auditResult: result,
       dependencies,
