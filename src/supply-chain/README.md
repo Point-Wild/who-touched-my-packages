@@ -145,7 +145,7 @@ await analyzeSupplyChain(deps, options, (stage, done, total) => {
 
 ### Verbose Logging
 
-Set `SC_VERBOSE=1` to see detailed triage scores, per-file analysis progress, and tool call traces.
+Use the CLI `--verbose` flag to see detailed triage scores, per-file analysis progress, and tool call traces.
 
 ## Output
 
@@ -221,5 +221,4 @@ All known-good models and provider configurations are defined in [`llm/models.ts
 | `OPENAI_API_KEY` | API key for OpenAI provider | Required when using OpenAI |
 | `GOOGLE_API_KEY` | API key for Google Gemini provider | Required when using Gemini directly |
 | `OPENROUTER_API_KEY` | API key for OpenRouter provider | Required when using OpenRouter |
-| `SC_VERBOSE` | Set to `1` for detailed triage scores, per-file analysis progress, and tool call traces | `0` |
 | `SC_MAX_LLM_FILES` | Maximum files per package sent to the LLM for analysis | `30` |

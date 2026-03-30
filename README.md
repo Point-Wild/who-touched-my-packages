@@ -331,8 +331,9 @@ This will show exactly which packages have provenance and what the registry resp
 - `OPENAI_API_KEY` - API key for OpenAI LLM provider (supply chain analysis)
 - `GOOGLE_API_KEY` - API key for Google Gemini LLM provider (supply chain analysis)
 - `OPENROUTER_API_KEY` - API key for OpenRouter LLM provider (supply chain analysis)
-- `SC_VERBOSE` - Set to `1` for detailed supply chain analysis logging (triage scores, tool calls)
 - `SC_MAX_LLM_FILES` - Maximum files per package sent to LLM (default: `30`)
+
+Use `--verbose` for detailed supply chain analysis logging (triage scores, tool calls).
 
 ### Supply Chain LLM Providers
 

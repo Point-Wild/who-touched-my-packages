@@ -51,6 +51,7 @@ export async function analyzeSupplyChain(
     chatModel,
     modelName: model,
     concurrency,
+    verbose: options.verbose ?? false,
     maxPackages: options.maxPackages ?? 0,
     onProgress,
   });

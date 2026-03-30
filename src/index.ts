@@ -362,10 +362,11 @@ async function main() {
       }
 
       try {
-        supplyChainReport = await analyzeSupplyChain(supplyChainDependencies, {
+        supplyChainReport = await analyzeSupplyChain(allDependencies, {
           model: options.supplyChainModel,
           provider: options.llmProvider,
           concurrency: parseInt(options.supplyChainConcurrency, 10),
+          verbose: options.verbose,
           depth: supplyChainDepth,
           maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
           dryRun: options.supplyChainDryRun,

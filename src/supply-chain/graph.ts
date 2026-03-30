@@ -45,6 +45,7 @@ export interface GraphOptions {
   chatModel: BaseChatModel;
   modelName: string;
   concurrency: number;
+  verbose?: boolean;
   maxPackages?: number;
   onProgress?: (stage: string, done: number, total: number) => void;
 }
@@ -53,7 +54,7 @@ export interface GraphOptions {
  * Build and compile the LangGraph supply chain analysis workflow.
  */
 export function buildAnalysisGraph(options: GraphOptions) {
-  const { chatModel, modelName, concurrency, maxPackages = 0, onProgress } = options;
+  const { chatModel, modelName, concurrency, verbose = false, maxPackages = 0, onProgress } = options;
 
   const graph = new StateGraph(AnalysisAnnotation)
     .addNode('fetch_metadata', async (state: AnalysisState) => {
@@ -71,6 +72,7 @@ export function buildAnalysisGraph(options: GraphOptions) {
         state.sources,
         chatModel,
         concurrency,
+        verbose,
         (done, total) => onProgress?.('Investigating packages', done, total)
       );
       return { primaryFindings: findings };
