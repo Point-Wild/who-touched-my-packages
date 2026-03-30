@@ -236,7 +236,8 @@ export class Reporter {
     repositoryUrl?: string,
     languageStats?: import('./html-report/types.js').LanguageStats[],
     dependencyEdges?: DependencyEdge[],
-    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport
+    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport,
+    unresolvedDependencies?: import('../scanner/types.js').UnresolvedDependency[]
   ): Promise<{ url: string; close: () => void }> {
 
     const reportData: ReportData = {
@@ -246,6 +247,7 @@ export class Reporter {
       repositoryUrl,
       languageStats,
       dependencyEdges,
+      unresolvedDependencies,
     };
     
     const { generateAndServeReport } = await import('./html-report/new-generator.js');

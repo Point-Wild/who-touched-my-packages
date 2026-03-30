@@ -13,7 +13,7 @@ import { parseDependencies } from './scanner/dependency-parser.js';
 import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency-tree-resolver.js';
 import { findDependencyFiles } from './scanner/file-finder.js';
 import { detectLanguages } from './scanner/language-detector.js';
-import type { Dependency, DependencyEdge } from './scanner/types.js';
+import type { Dependency, DependencyEdge, UnresolvedDependency } from './scanner/types.js';
 import { analyzeSupplyChain, DEFAULT_CONCURRENCY, DEFAULT_MODEL, type SupplyChainReport } from './supply-chain/index.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
@@ -160,6 +160,7 @@ async function main() {
   // Build dependency trees for graph visualization and/or transitive supply chain scanning
   let allDependencies: Dependency[] = dependencies;
   let dependencyEdges: DependencyEdge[] = [];
+  let unresolvedDependencies: UnresolvedDependency[] = [];
 
   const supplyChainDepth = parseInt(options.supplyChainDepth ?? '1', 10);
   const needsTree = options.html || (options.supplyChain && supplyChainDepth > 1);
@@ -195,6 +196,7 @@ async function main() {
         });
 
         dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
       } catch (error) {
         // Skip files that fail to parse
       }
@@ -231,6 +233,7 @@ async function main() {
         });
 
         dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
       } catch (error) {
         // Skip files that fail to parse
       }
@@ -256,6 +259,7 @@ async function main() {
         });
 
         dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
       } catch (error) {
         // Skip files that fail to parse
       }
@@ -281,6 +285,7 @@ async function main() {
         });
 
         dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
       } catch (error) {
         // Skip files that fail to parse
       }
@@ -373,7 +378,7 @@ async function main() {
     }
     
     const languageStats = await detectLanguages(scanPath, options.exclude);
-    const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges, supplyChainReport);
+    const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges, supplyChainReport, unresolvedDependencies);
     
     if (spinner) {
       spinner.succeed('HTML report generated');

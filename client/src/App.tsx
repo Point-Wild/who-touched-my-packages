@@ -3,6 +3,7 @@ import { DependenciesTab } from './components/DependenciesTab';
 import { GraphTab } from './components/GraphTab';
 import { OverviewTab } from './components/OverviewTab';
 import { PinningTab } from './components/PinningTab';
+import { UnresolvedDependenciesTab } from './components/UnresolvedDependenciesTab';
 import { VulnerabilitiesTab } from './components/VulnerabilitiesTab';
 import type { ReportData } from './types';
 
@@ -175,6 +176,14 @@ export function App() {
         >
           📌 Pinning Issues
         </button>
+        {data.unresolvedDependencies && data.unresolvedDependencies.length > 0 && (
+          <button
+            className={`tab ${activeTab === 'unresolved' ? 'active' : ''}`}
+            onClick={() => setActiveTab('unresolved')}
+          >
+            ❓ Unresolved ({data.unresolvedDependencies.length})
+          </button>
+        )}
         <button
           className={`tab ${activeTab === 'graph' ? 'active' : ''}`}
           onClick={() => setActiveTab('graph')}
@@ -198,6 +207,12 @@ export function App() {
       <div className={`tab-content ${activeTab === 'pinning' ? 'active' : ''}`}>
         <PinningTab data={data} />
       </div>
+
+      {data.unresolvedDependencies && data.unresolvedDependencies.length > 0 && (
+        <div className={`tab-content ${activeTab === 'unresolved' ? 'active' : ''}`}>
+          <UnresolvedDependenciesTab data={data} />
+        </div>
+      )}
 
       <div className={`tab-content ${activeTab === 'graph' ? 'active' : ''}`}>
         <GraphTab data={data} />

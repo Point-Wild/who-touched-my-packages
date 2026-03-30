@@ -38,6 +38,15 @@ export interface Dependency {
   provenance?: boolean;
 }
 
+export interface UnresolvedDependency {
+  name: string;
+  versionSpec: string;
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+  file: string;
+  isDev?: boolean;
+  reason: 'not_found' | 'registry_unavailable' | 'no_access' | 'invalid_spec';
+}
+
 export interface DependencyEdge {
   source: string;
   target: string;
@@ -57,6 +66,7 @@ export interface ReportData {
   repositoryUrl?: string;
   languageStats?: LanguageStats[];
   dependencyEdges?: DependencyEdge[];
+  unresolvedDependencies?: UnresolvedDependency[];
 }
 
 export interface VulnerabilityWithPath extends Vulnerability {
