@@ -259,6 +259,52 @@ Currently integrated:
 
 See [datasources.md](./datasources.md) for details on all current and planned data sources.
 
+## 🧪 Testing
+
+The repo includes several ad hoc test harnesses for vulnerability detection and supply chain analysis.
+
+### Run the core test suite
+
+This runs the stable local suite:
+- TypeScript typecheck
+- Known-vulnerable package checks for npm, PyPI, Go, and Rust
+- Synthetic malicious package tests for npm, PyPI, Go, and Rust
+
+```bash
+npm run test:all
+```
+
+### Run individual CVE/advisory checks
+
+These test `checker.checkDependencies(...)` directly against OSV-backed vulnerable package versions.
+
+```bash
+npm run test:cve:npm
+npm run test:cve:python
+npm run test:cve:go
+npm run test:cve:rust
+```
+
+### Run LLM-backed package analysis tests
+
+These require `OPENROUTER_API_KEY`.
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:npm
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:python
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:go
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:rust
+```
+
+### Run specialized test harnesses
+
+```bash
+npm run test:efficacy
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:efficacy:llm
+npm run test:malware:litellm
+npm run test:integration
+```
+
 ## � Provenance Verification
 
 The tool automatically verifies package provenance to help ensure supply chain security. This feature checks whether packages have cryptographic attestations proving their build integrity and origin.
@@ -331,7 +377,7 @@ This will show exactly which packages have provenance and what the registry resp
 - `OPENAI_API_KEY` - API key for OpenAI LLM provider (supply chain analysis)
 - `GOOGLE_API_KEY` - API key for Google Gemini LLM provider (supply chain analysis)
 - `OPENROUTER_API_KEY` - API key for OpenRouter LLM provider (supply chain analysis)
-- `SC_MAX_LLM_FILES` - Maximum files per package sent to LLM (default: `30`)
+- `SC_MAX_LLM_FILES` - Maximum files per package sent to LLM (default: `10`)
 
 Use `--verbose` for detailed supply chain analysis logging (triage scores, tool calls).
 
