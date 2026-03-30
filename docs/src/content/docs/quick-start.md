@@ -30,7 +30,7 @@ wtmp
 ```
 
 The tool will:
-1. Recursively find all `package.json` and `requirements.txt` files
+1. Recursively find all Node.js, Python, Ruby, Go, and Rust package dependency files
 2. Parse the dependencies
 3. Query OSV
 4. Display a beautiful report

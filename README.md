@@ -4,7 +4,7 @@ A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities
 
 ## ✨ Features
 
-- 🔍 **Recursive scanning** - Finds all `package.json` and `requirements.txt` files in your project
+- 🔍 **Recursive scanning** - Finds all Node.js, Python, Ruby, Go, and Rust package dependency files in your project
 - 🐙 **Remote repository scanning** - Clone and scan any Git repository directly
 - 🌐 **Multiple data sources** - Queries OSV for comprehensive coverage
 - 🔐 **Provenance verification** - Checks for SLSA provenance attestations on npm and PyPI packages
@@ -414,9 +414,12 @@ src/
 
 ## 📝 Supported Package Managers
 
-- ✅ npm (`package.json`)
+- ✅ Node.js npm (`package.json`)
 - ✅ Python pip (`requirements.txt`)
-- 📋 Planned: Cargo, Go modules, Maven, Composer, Bundler, and more
+- ✅ Ruby Gemfile (`Gemfile.lock`)
+- ✅ Rust cargo (`Cargo.lock, Cargo.toml`)
+- ✅ Go modules (`go.sum, go.mod`)
+- 📋 Planned: Maven, Composer, Bundler, and more
 
 ## 🤔 Why Another Security Tool?
 

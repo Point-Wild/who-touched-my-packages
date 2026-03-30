@@ -21,7 +21,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="Multi-Ecosystem" icon="puzzle">
-    Supports npm (package.json) and Python (requirements.txt) with more coming soon
+    Supports npm, Python, Ruby, Go, and Rust with more coming soon
   </Card>
   <Card title="Remote Repository Scanning" icon="github">
     Clone and scan any Git repository directly without manual setup
@@ -30,25 +30,31 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     Queries OSV for comprehensive vulnerability coverage
   </Card>
   <Card title="Provenance Verification" icon="approve-check">
-    Automatically checks for SLSA provenance attestations to verify package integrity
+    Automatically checks for SLSA provenance attestations to verify package integrity in NPM and PyPI
   </Card>
   <Card title="Beautiful UI" icon="star">
     Colorful, emoji-rich terminal output with automatic light/dark mode detection
   </Card>
-  <Card title="CI/CD Ready" icon="rocket">
+  <Card title="CI/CD Ready" icon="star">
     JSON output and exit codes make it perfect for automation pipelines
   </Card>
-  <Card title="Severity Filtering" icon="magnifier">
+  <Card title="Severity Filtering" icon="information">
     Filter vulnerabilities by severity level (CRITICAL, HIGH, MEDIUM, LOW)
+  </Card>
+  <Card title="Dependency Pinning" icon="download">
+    Ensure dependencies are pinned for Node.js and Python
   </Card>
   <Card title="Recursive Scanning" icon="document">
     Automatically finds all dependency files in your project tree
   </Card>
-  <Card title="Fast & Efficient" icon="lightning">
+  <Card title="Fast & Efficient" icon="rocket">
     Parallel API requests and smart caching for quick scans
   </Card>
   <Card title="Extensible" icon="seti:config">
     Easy to add new data sources and package managers
+  </Card>
+  <Card title="Optional LLM Scanning" icon="magnifier">
+    Optionally provide an API key to scan with frontier LLM models
   </Card>
 </CardGrid>
 
