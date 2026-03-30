@@ -335,45 +335,68 @@ async function main() {
   // Run supply chain analysis if enabled
   let supplyChainReport: SupplyChainReport | undefined;
   if (options.supplyChain) {
-    if (spinner) {
-      spinner.text = 'Running supply chain security analysis...';
+    const vulnerablePackages = new Set(
+      result.vulnerabilities.map(v => `${v.ecosystem}:${v.packageName}@${v.packageVersion}`)
+    );
+    const skippedSupplyChainDependencies = allDependencies.filter(
+      dep => vulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
+    );
+    const supplyChainDependencies = allDependencies.filter(
+      dep => !vulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
+    );
+
+    if (skippedSupplyChainDependencies.length > 0 && !options.json && !options.quiet) {
+      console.log(theme.dim('\nSkipping supply chain analysis for packages with known vulnerabilities:'));
+      for (const dep of skippedSupplyChainDependencies) {
+        console.log(theme.dim(`  • [${dep.ecosystem}] ${dep.name}@${dep.version}`));
+      }
     }
-    
-    try {
-      supplyChainReport = await analyzeSupplyChain(allDependencies, {
-        model: options.supplyChainModel,
-        provider: options.llmProvider,
-        concurrency: parseInt(options.supplyChainConcurrency, 10),
-        depth: supplyChainDepth,
-        maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
-        dryRun: options.supplyChainDryRun,
-      }, (stage, done, total) => {
-        if (spinner) {
-          spinner.text = `Supply chain analysis: ${stage} (${done}/${total})...`;
-        }
-      });
-      
+
+    if (supplyChainDependencies.length === 0) {
+      if (!options.json && !options.quiet) {
+        console.log(theme.dim('No packages remain for supply chain analysis after excluding known vulnerable packages.'));
+      }
+    } else {
       if (spinner) {
-        spinner.succeed('Supply chain analysis complete');
+        spinner.text = 'Running supply chain security analysis...';
       }
 
-      if (supplyChainReport.fetchErrors.length > 0 && !options.json && !options.quiet) {
-        console.log(theme.high(`\n${icons.warning} ${supplyChainReport.fetchErrors.length} package fetch error(s) during supply chain analysis:`));
-        for (const error of supplyChainReport.fetchErrors.slice(0, 5)) {
-          const target = error.packageVersion
-            ? `${error.packageName}@${error.packageVersion}`
-            : error.packageName;
-          console.log(theme.dim(`  • [${error.ecosystem}/${error.stage}] ${target}: ${error.message}`));
+      try {
+        supplyChainReport = await analyzeSupplyChain(supplyChainDependencies, {
+          model: options.supplyChainModel,
+          provider: options.llmProvider,
+          concurrency: parseInt(options.supplyChainConcurrency, 10),
+          depth: supplyChainDepth,
+          maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
+          dryRun: options.supplyChainDryRun,
+        }, (stage, done, total) => {
+          if (spinner) {
+            spinner.text = `Supply chain analysis: ${stage} (${done}/${total})...`;
+          }
+        });
+
+        if (spinner) {
+          spinner.succeed('Supply chain analysis complete');
         }
-        if (supplyChainReport.fetchErrors.length > 5) {
-          console.log(theme.dim(`  ... and ${supplyChainReport.fetchErrors.length - 5} more`));
+
+        if (supplyChainReport.fetchErrors.length > 0 && !options.json && !options.quiet) {
+          console.log(theme.high(`\n${icons.warning} ${supplyChainReport.fetchErrors.length} package fetch error(s) during supply chain analysis:`));
+          for (const error of supplyChainReport.fetchErrors.slice(0, 5)) {
+            const target = error.packageVersion
+              ? `${error.packageName}@${error.packageVersion}`
+              : error.packageName;
+            console.log(theme.dim(`  • [${error.ecosystem}/${error.stage}] ${target}: ${error.message}`));
+          }
+          if (supplyChainReport.fetchErrors.length > 5) {
+            console.log(theme.dim(`  ... and ${supplyChainReport.fetchErrors.length - 5} more`));
+          }
         }
-      }
-    } catch (error: any) {
-      if (spinner) {
-        spinner.fail(`Supply chain analysis failed: ${error.message}`);
-      } else if (options.verbose) {
-        console.error(`Supply chain analysis error: ${error.message}`);
+      } catch (error: any) {
+        if (spinner) {
+          spinner.fail(`Supply chain analysis failed: ${error.message}`);
+        } else if (options.verbose) {
+          console.error(`Supply chain analysis error: ${error.message}`);
+        }
       }
     }
   }
