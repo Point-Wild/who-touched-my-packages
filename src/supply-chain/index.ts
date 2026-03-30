@@ -25,6 +25,7 @@ export async function analyzeSupplyChain(
   if (options.dryRun) {
     return {
       findings: [],
+      fetchErrors: [],
       summary: {
         packagesAnalyzed: dependencies.length,
         packagesWithFindings: 0,
@@ -58,6 +59,7 @@ export async function analyzeSupplyChain(
     dependencies,
     metadata: new Map(),
     sources: new Map(),
+    fetchErrors: [],
     primaryFindings: [],
     allFindings: [],
     result: null,
@@ -65,6 +67,7 @@ export async function analyzeSupplyChain(
 
   return finalState.result ?? {
     findings: [],
+    fetchErrors: [],
     summary: {
       packagesAnalyzed: 0,
       packagesWithFindings: 0,

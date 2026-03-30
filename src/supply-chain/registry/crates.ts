@@ -1,4 +1,5 @@
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
+import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
 import {
   computeTyposquatCandidate,
@@ -10,7 +11,7 @@ const CRATES_BASE = 'https://crates.io/api/v1/crates';
 
 export async function fetchCratesMetadata(packageName: string): Promise<PackageMetadata | null> {
   const res = await fetch(`${CRATES_BASE}/${encodeURIComponent(packageName)}`);
-  if (!res.ok) return null;
+  if (!res.ok) throw createRegistryFetchError('crates.io', packageName, res.status);
 
   const data = await res.json() as any;
   const crate = data.crate ?? {};
@@ -66,7 +67,7 @@ export async function fetchCratesSource(
 ): Promise<PackageSource | null> {
   const tarballUrl = `https://static.crates.io/crates/${encodeURIComponent(packageName)}/${encodeURIComponent(packageName)}-${encodeURIComponent(version)}.crate`;
   const res = await fetch(tarballUrl);
-  if (!res.ok) return null;
+  if (!res.ok) throw createRegistryFetchError('crates.io', packageName, res.status, version);
 
   const CRATE_TEXT_PATTERN = /\.(rs|toml|md|txt|json|ya?ml|sh|lock)$/i;
   const { fileList, fileContents } = await downloadAndExtractTarGz(res, CRATE_TEXT_PATTERN);

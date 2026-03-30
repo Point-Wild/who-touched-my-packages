@@ -1,10 +1,10 @@
 import type { Dependency } from '../../scanner/types.js';
-import type { PackageMetadata, PackageSource } from '../types.js';
+import type { PackageFetchError, PackageMetadata, PackageSource } from '../types.js';
 import { fetchCratesMetadata, fetchCratesSource } from '../registry/crates.js';
 import { fetchGoMetadata, fetchGoSource } from '../registry/golang.js';
 import { fetchNpmMetadata, fetchNpmSource } from '../registry/npm.js';
 import { fetchPypiMetadata, fetchPypiSource } from '../registry/pypi.js';
-import { pMap, depKey } from '../utils.js';
+import { describeFetchError, pMap, depKey } from '../utils.js';
 
 /**
  * Fetch registry metadata and download source tarballs for all dependencies.
@@ -24,9 +24,11 @@ export async function fetchMetadataNode(
 ): Promise<{
   metadata: Map<string, PackageMetadata>;
   sources: Map<string, PackageSource>;
+  fetchErrors: PackageFetchError[];
 }> {
   const metadata = new Map<string, PackageMetadata>();
   const sources = new Map<string, PackageSource>();
+  const fetchErrors: PackageFetchError[] = [];
 
   // Deduplicate by name+ecosystem (same package may appear in multiple lockfiles)
   const unique = new Map<string, Dependency>();
@@ -50,8 +52,6 @@ export async function fetchMetadataNode(
       const key = depKey(dep.ecosystem, dep.name);
 
       try {
-        // Fetch metadata first so we can pass the previous-version hint to the
-        // source fetcher (needed for version-diff computation in npm).
         const meta = dep.ecosystem === 'npm'
           ? await fetchNpmMetadata(dep.name)
           : dep.ecosystem === 'pypi'
@@ -62,20 +62,59 @@ export async function fetchMetadataNode(
 
         if (meta) {
           metadata.set(key, meta);
-
-          // For npm, pass the previous version so fetchNpmSource can diff tarballs.
-          const source = dep.ecosystem === 'npm'
-            ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
-            : dep.ecosystem === 'pypi'
-              ? await fetchPypiSource(dep.name, dep.version)
-              : dep.ecosystem === 'cratesio'
-                ? await fetchCratesSource(dep.name, dep.version)
-                : await fetchGoSource(dep.name, dep.version);
-
-          if (source) sources.set(key, source);
         }
-      } catch {
-        // Skip packages that fail to fetch — don't block the scan
+      } catch (error) {
+        const { message, statusCode } = describeFetchError(error);
+        fetchErrors.push({
+          packageName: dep.name,
+          packageVersion: dep.version,
+          ecosystem: dep.ecosystem,
+          stage: 'metadata',
+          message,
+          statusCode,
+        });
+        done++;
+        onProgress?.(done, deps.length);
+        return;
+      }
+
+      try {
+        const meta = metadata.get(key);
+        if (!meta) {
+          done++;
+          onProgress?.(done, deps.length);
+          return;
+        }
+
+        const source = dep.ecosystem === 'npm'
+          ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
+          : dep.ecosystem === 'pypi'
+            ? await fetchPypiSource(dep.name, dep.version)
+            : dep.ecosystem === 'cratesio'
+              ? await fetchCratesSource(dep.name, dep.version)
+              : await fetchGoSource(dep.name, dep.version);
+
+        if (source) {
+          sources.set(key, source);
+        } else {
+          fetchErrors.push({
+            packageName: dep.name,
+            packageVersion: dep.version,
+            ecosystem: dep.ecosystem,
+            stage: 'source',
+            message: `No source archive available for ${dep.name}@${dep.version}`,
+          });
+        }
+      } catch (error) {
+        const { message, statusCode } = describeFetchError(error);
+        fetchErrors.push({
+          packageName: dep.name,
+          packageVersion: dep.version,
+          ecosystem: dep.ecosystem,
+          stage: 'source',
+          message,
+          statusCode,
+        });
       }
 
       done++;
@@ -84,5 +123,5 @@ export async function fetchMetadataNode(
     concurrency
   );
 
-  return { metadata, sources };
+  return { metadata, sources, fetchErrors };
 }

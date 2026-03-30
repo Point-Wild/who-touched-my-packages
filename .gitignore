@@ -8,3 +8,4 @@ dist/
 docs/.astro
 docs/node_modules/
 .astro/
+.vscode/

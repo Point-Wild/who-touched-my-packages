@@ -56,8 +56,18 @@ export interface SupplyChainFinding {
   deepInvestigated: boolean;
 }
 
+export interface PackageFetchError {
+  packageName: string;
+  packageVersion?: string;
+  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang';
+  stage: 'metadata' | 'source';
+  message: string;
+  statusCode?: number;
+}
+
 export interface SupplyChainReport {
   findings: SupplyChainFinding[];
+  fetchErrors: PackageFetchError[];
   summary: {
     packagesAnalyzed: number;
     packagesWithFindings: number;
@@ -127,6 +137,7 @@ export interface AnalysisState {
   dependencies: Dependency[];
   metadata: Map<string, PackageMetadata>;
   sources: Map<string, PackageSource>;
+  fetchErrors: PackageFetchError[];
   primaryFindings: SupplyChainFinding[];
   deepFindings: SupplyChainFinding[];
   result?: SupplyChainReport;

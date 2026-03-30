@@ -356,6 +356,19 @@ async function main() {
       if (spinner) {
         spinner.succeed('Supply chain analysis complete');
       }
+
+      if (supplyChainReport.fetchErrors.length > 0 && !options.json && !options.quiet) {
+        console.log(theme.high(`\n${icons.warning} ${supplyChainReport.fetchErrors.length} package fetch error(s) during supply chain analysis:`));
+        for (const error of supplyChainReport.fetchErrors.slice(0, 5)) {
+          const target = error.packageVersion
+            ? `${error.packageName}@${error.packageVersion}`
+            : error.packageName;
+          console.log(theme.dim(`  • [${error.ecosystem}/${error.stage}] ${target}: ${error.message}`));
+        }
+        if (supplyChainReport.fetchErrors.length > 5) {
+          console.log(theme.dim(`  ... and ${supplyChainReport.fetchErrors.length - 5} more`));
+        }
+      }
     } catch (error: any) {
       if (spinner) {
         spinner.fail(`Supply chain analysis failed: ${error.message}`);

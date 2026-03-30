@@ -1,4 +1,5 @@
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
+import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractZip } from './tarball.js';
 import {
   computeTyposquatCandidate,
@@ -24,7 +25,8 @@ export async function fetchGoMetadata(packageName: string): Promise<PackageMetad
     fetch(`${GO_PROXY_BASE}/${escaped}/@v/list`).catch(() => null),
   ]);
 
-  if (!latestRes?.ok) return null;
+  if (!latestRes) throw new Error(`Go proxy request failed for ${packageName}`);
+  if (!latestRes.ok) throw createRegistryFetchError('Go proxy', packageName, latestRes.status);
 
   const latest = await latestRes.json() as { Version?: string; Time?: string };
   const versionsText = versionsRes?.ok ? await versionsRes.text() : '';
@@ -78,7 +80,7 @@ export async function fetchGoSource(
 ): Promise<PackageSource | null> {
   const escaped = escapeGoModulePath(packageName);
   const res = await fetch(`${GO_PROXY_BASE}/${escaped}/@v/${encodeURIComponent(version)}.zip`);
-  if (!res.ok) return null;
+  if (!res.ok) throw createRegistryFetchError('Go proxy', packageName, res.status, version);
 
   const GO_TEXT_PATTERN = /\.(go|mod|sum|md|txt|json|ya?ml|sh)$/i;
   const { fileList, fileContents } = await downloadAndExtractZip(res, GO_TEXT_PATTERN);

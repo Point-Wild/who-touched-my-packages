@@ -8,6 +8,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
   build: {
     ssr: true,
+    sourcemap: true,
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       formats: ['es'],
