@@ -1,5 +1,5 @@
 import type { AuditResult, Vulnerability } from '../../auditor/types.js';
-import type { Dependency, DependencyEdge } from '../../scanner/types.js';
+import type { Dependency, DependencyEdge, UnresolvedDependency } from '../../scanner/types.js';
 
 export interface LanguageStats {
   language: string;
@@ -14,6 +14,7 @@ export interface ReportData {
   repositoryUrl?: string;
   languageStats?: LanguageStats[];
   dependencyEdges?: DependencyEdge[];
+  unresolvedDependencies?: UnresolvedDependency[];
 }
 
 export interface VulnerabilityWithPath extends Vulnerability {

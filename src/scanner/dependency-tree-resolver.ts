@@ -102,6 +102,7 @@ export interface DependencyTree {
   roots: DependencyNode[];
   allNodes: Map<string, DependencyNode>;
   edges: Array<{ source: string; target: string; type: 'dependency' | 'dev' }>;
+  unresolved: Array<{ name: string; versionSpec: string; ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby'; file: string; isDev?: boolean; reason: 'not_found' | 'registry_unavailable' | 'no_access' | 'invalid_spec' }>;
 }
 
 const MAX_DEPTH = 10;
@@ -135,7 +136,8 @@ async function resolveNpmDependency(
   isDev: boolean,
   depth: number,
   visited: Set<string>,
-  currentPath: string[]
+  currentPath: string[],
+  tree: DependencyTree
 ): Promise<DependencyNode | null> {
   if (depth >= MAX_DEPTH) return null;
   
@@ -173,6 +175,19 @@ async function resolveNpmDependency(
     }
   }
   
+  // If still no package data, track as unresolved
+  if (!pkg) {
+    tree.unresolved.push({
+      name,
+      versionSpec,
+      ecosystem: 'npm',
+      file: parentFile,
+      isDev,
+      reason: 'not_found',
+    });
+    return null;
+  }
+  
   const node: DependencyNode = {
     name,
     version: resolvedVersion,
@@ -195,7 +210,8 @@ async function resolveNpmDependency(
         false,
         depth + 1,
         visited,
-        [...currentPath, name]
+        [...currentPath, name],
+        tree
       );
       if (childNode) {
         node.dependencies.push(childNode);
@@ -213,7 +229,8 @@ async function resolvePypiDependency(
   isDev: boolean,
   depth: number,
   visited: Set<string>,
-  currentPath: string[]
+  currentPath: string[],
+  tree: DependencyTree
 ): Promise<DependencyNode | null> {
   if (depth >= MAX_DEPTH) return null;
   
@@ -230,6 +247,19 @@ async function resolvePypiDependency(
   
   if (pkg?.info?.version) {
     resolvedVersion = pkg.info.version;
+  }
+  
+  // If no package data, track as unresolved
+  if (!pkg) {
+    tree.unresolved.push({
+      name,
+      versionSpec,
+      ecosystem: 'pypi',
+      file: parentFile,
+      isDev,
+      reason: 'not_found',
+    });
+    return null;
   }
   
   const node: DependencyNode = {
@@ -264,7 +294,8 @@ async function resolvePypiDependency(
           false,
           depth + 1,
           visited,
-          [...currentPath, name]
+          [...currentPath, name],
+          tree
         );
         if (childNode) {
           node.dependencies.push(childNode);
@@ -400,7 +431,8 @@ async function resolveCargoDependency(
   isDev: boolean,
   depth: number,
   visited: Set<string>,
-  currentPath: string[]
+  currentPath: string[],
+  tree: DependencyTree
 ): Promise<DependencyNode | null> {
   if (depth >= MAX_DEPTH) return null;
   
@@ -432,6 +464,19 @@ async function resolveCargoDependency(
     }
   }
   
+  // If no crate data, track as unresolved
+  if (!crate) {
+    tree.unresolved.push({
+      name,
+      versionSpec,
+      ecosystem: 'cargo',
+      file: parentFile,
+      isDev,
+      reason: 'not_found',
+    });
+    return null;
+  }
+  
   const node: DependencyNode = {
     name,
     version: resolvedVersion,
@@ -460,7 +505,8 @@ async function resolveCargoDependency(
           dep.kind === 'dev',
           depth + 1,
           new Set(visited),
-          [...currentPath, name]
+          [...currentPath, name],
+          tree
         );
         if (childNode) {
           node.dependencies.push(childNode);
@@ -570,7 +616,8 @@ async function resolveGoDependency(
   isDev: boolean,
   depth: number,
   visited: Set<string>,
-  currentPath: string[]
+  currentPath: string[],
+  tree: DependencyTree
 ): Promise<DependencyNode | null> {
   if (depth >= MAX_DEPTH) return null;
   
@@ -587,6 +634,19 @@ async function resolveGoDependency(
   
   if (module?.Version) {
     resolvedVersion = module.Version.replace(/^v/, '');
+  }
+  
+  // If no module data, track as unresolved
+  if (!module) {
+    tree.unresolved.push({
+      name,
+      versionSpec,
+      ecosystem: 'go',
+      file: parentFile,
+      isDev,
+      reason: 'not_found',
+    });
+    return null;
   }
   
   const node: DependencyNode = {
@@ -618,7 +678,8 @@ async function resolveGoDependency(
           dep.isDev || false,
           depth + 1,
           new Set(visited),
-          [...currentPath, name]
+          [...currentPath, name],
+          tree
         );
         if (childNode) {
           node.dependencies.push(childNode);
@@ -737,7 +798,8 @@ async function resolveRubyDependency(
   isDev: boolean,
   depth: number,
   visited: Set<string>,
-  currentPath: string[]
+  currentPath: string[],
+  tree: DependencyTree
 ): Promise<DependencyNode | null> {
   if (depth >= MAX_DEPTH) return null;
   
@@ -753,6 +815,19 @@ async function resolveRubyDependency(
   
   if (gem?.version) {
     resolvedVersion = gem.version;
+  }
+  
+  // If no gem data, track as unresolved
+  if (!gem) {
+    tree.unresolved.push({
+      name,
+      versionSpec,
+      ecosystem: 'ruby',
+      file: parentFile,
+      isDev,
+      reason: 'not_found',
+    });
+    return null;
   }
   
   const node: DependencyNode = {
@@ -776,7 +851,8 @@ async function resolveRubyDependency(
         false,
         depth + 1,
         new Set(visited),
-        [...currentPath, name]
+        [...currentPath, name],
+        tree
       );
       if (childNode) {
         node.dependencies.push(childNode);
@@ -795,6 +871,7 @@ export async function buildDependencyTree(
     roots: [],
     allNodes: new Map(),
     edges: [],
+    unresolved: [],
   };
   
   if (ecosystem === 'npm') {
@@ -812,7 +889,8 @@ export async function buildDependencyTree(
             false,
             0,
             visited,
-            []
+            [],
+            tree
           );
           if (node) {
             tree.roots.push(node);
@@ -830,7 +908,8 @@ export async function buildDependencyTree(
             true,
             0,
             visited,
-            []
+            [],
+            tree
           );
           if (node) {
             tree.roots.push(node);
@@ -873,7 +952,8 @@ export async function buildDependencyTree(
             false,
             0,
             visited,
-            []
+            [],
+            tree
           );
           if (node) {
             tree.roots.push(node);
@@ -900,7 +980,8 @@ export async function buildDependencyTree(
           dep.isDev || false,
           0,
           visited,
-          []
+          [],
+          tree
         );
         if (node) {
           tree.roots.push(node);
@@ -926,7 +1007,8 @@ export async function buildDependencyTree(
           dep.isDev || false,
           0,
           visited,
-          []
+          [],
+          tree
         );
         if (node) {
           tree.roots.push(node);
@@ -952,7 +1034,8 @@ export async function buildDependencyTree(
           dep.isDev || false,
           0,
           visited,
-          []
+          [],
+          tree
         );
         if (node) {
           tree.roots.push(node);

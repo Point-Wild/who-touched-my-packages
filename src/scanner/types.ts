@@ -23,10 +23,20 @@ export interface DependencyEdge {
   type: 'dependency' | 'dev';
 }
 
+export interface UnresolvedDependency {
+  name: string;
+  versionSpec: string;
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+  file: string;
+  isDev?: boolean;
+  reason: 'not_found' | 'registry_unavailable' | 'no_access' | 'invalid_spec';
+}
+
 export interface ScanResult {
   files: DependencyFile[];
   dependencies: Dependency[];
   dependencyEdges?: DependencyEdge[];
+  unresolvedDependencies?: UnresolvedDependency[];
   scanPath: string;
   timestamp: Date;
 }
