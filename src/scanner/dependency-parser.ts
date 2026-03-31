@@ -34,6 +34,8 @@ export async function parseDependencies(files: DependencyFile[]): Promise<Depend
         dependencies.push(...parseGoSum(content, file.path));
       } else if (file.type === 'Gemfile.lock') {
         dependencies.push(...parseGemfileLock(content, file.path));
+      } else if (file.type === 'Gemfile') {
+        dependencies.push(...parseGemfile(content, file.path));
       }
     } catch (error) {
       // Skip files we can't read
@@ -834,6 +836,46 @@ function parseGoSum(content: string, filePath: string): Dependency[] {
     }
   }
   
+  return dependencies;
+}
+
+function parseGemfile(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const lines = content.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    // Parse gem declarations
+    // Format: gem 'name', 'version' or gem "name", "version"
+    // Also supports: gem 'name', '~> 1.0' or gem 'name', '>= 1.0'
+    // Development gems: gem 'name', group: :development
+    // Or: gem 'name', groups: [:development, :test]
+    const gemMatch = trimmed.match(/^gem\s+['"]([^'"]+)['"](?:\s*,\s*['"]([^'"]+)['"])?/);
+    if (gemMatch) {
+      const name = gemMatch[1];
+      const versionSpec = gemMatch[2] || '*';
+
+      // Check if it's a dev dependency by looking for group: :development or groups containing :development
+      const isDev = /group[s]?\s*:\s*\[?[^\]]*:development[^\]]*\]?/.test(trimmed) ||
+                      /group\s*:\s*development/.test(trimmed);
+
+      dependencies.push({
+        name,
+        version: cleanVersion(versionSpec),
+        versionSpec,
+        ecosystem: 'ruby',
+        file: filePath,
+        isDev,
+      });
+    }
+  }
+
   return dependencies;
 }
 
