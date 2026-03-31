@@ -20,6 +20,10 @@ export async function parseDependencies(files: DependencyFile[]): Promise<Depend
         dependencies.push(...parseBunLock(content, file.path));
       } else if (file.type === 'requirements.txt') {
         dependencies.push(...parseRequirementsTxt(content, file.path));
+      } else if (file.type === 'poetry.lock') {
+        dependencies.push(...parsePoetryLock(content, file.path));
+      } else if (file.type === 'Pipfile.lock') {
+        dependencies.push(...parsePipfileLock(content, file.path));
       } else if (file.type === 'Cargo.toml') {
         dependencies.push(...parseCargoToml(content, file.path));
       } else if (file.type === 'Cargo.lock') {
@@ -445,6 +449,148 @@ function cleanVersion(version: string): string {
     .split(',')[0] // Take first version if multiple
     .split('||')[0] // Take first version if OR
     .trim();
+}
+
+function parsePoetryLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const seen = new Set<string>();
+  
+  try {
+    // Poetry.lock is a TOML file format
+    const lines = content.split('\n');
+    let inPackage = false;
+    let currentPackage: { name?: string; version?: string; category?: string } | null = null;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Start of a new package entry: [[package]]
+      if (trimmed === '[[package]]') {
+        // Save previous package
+        if (currentPackage?.name && currentPackage?.version) {
+          const key = `${currentPackage.name}@${currentPackage.version}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            dependencies.push({
+              name: currentPackage.name,
+              version: currentPackage.version,
+              versionSpec: currentPackage.version,
+              ecosystem: 'pypi',
+              file: filePath,
+              isDev: currentPackage.category === 'dev',
+              isPinned: true, // Poetry.lock versions are always pinned
+            });
+          }
+        }
+        currentPackage = {};
+        inPackage = true;
+        continue;
+      }
+      
+      if (!inPackage || !currentPackage) continue;
+      
+      // Parse name
+      const nameMatch = trimmed.match(/^name\s*=\s*"([^"]+)"/);
+      if (nameMatch) {
+        currentPackage.name = nameMatch[1];
+      }
+      
+      // Parse version
+      const versionMatch = trimmed.match(/^version\s*=\s*"([^"]+)"/);
+      if (versionMatch) {
+        currentPackage.version = versionMatch[1];
+      }
+      
+      // Parse category (dev vs main)
+      const categoryMatch = trimmed.match(/^category\s*=\s*"([^"]+)"/);
+      if (categoryMatch) {
+        currentPackage.category = categoryMatch[1];
+      }
+    }
+    
+    // Don't forget the last package
+    if (currentPackage?.name && currentPackage?.version) {
+      const key = `${currentPackage.name}@${currentPackage.version}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        dependencies.push({
+          name: currentPackage.name,
+          version: currentPackage.version,
+          versionSpec: currentPackage.version,
+          ecosystem: 'pypi',
+          file: filePath,
+          isDev: currentPackage.category === 'dev',
+          isPinned: true,
+        });
+      }
+    }
+  } catch (error) {
+    // Skip on parse error
+  }
+  
+  return dependencies;
+}
+
+function parsePipfileLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  
+  try {
+    const lockfile = JSON.parse(content);
+    
+    // Parse default (production) dependencies
+    if (lockfile.default) {
+      for (const [name, pkg] of Object.entries(lockfile.default)) {
+        if (!pkg || typeof pkg !== 'object') continue;
+        
+        const pkgData = pkg as Record<string, unknown>;
+        const version = (pkgData.version as string) || '';
+        
+        if (version) {
+          // Version is typically "==1.0.0" format, clean it up
+          const cleanVersion = version.replace(/^==/, '');
+          
+          dependencies.push({
+            name,
+            version: cleanVersion,
+            versionSpec: version,
+            ecosystem: 'pypi',
+            file: filePath,
+            isDev: false,
+            isPinned: true, // Pipfile.lock versions are always pinned
+          });
+        }
+      }
+    }
+    
+    // Parse develop (dev) dependencies
+    if (lockfile.develop) {
+      for (const [name, pkg] of Object.entries(lockfile.develop)) {
+        if (!pkg || typeof pkg !== 'object') continue;
+        
+        const pkgData = pkg as Record<string, unknown>;
+        const version = (pkgData.version as string) || '';
+        
+        if (version) {
+          // Version is typically "==1.0.0" format, clean it up
+          const cleanVersion = version.replace(/^==/, '');
+          
+          dependencies.push({
+            name,
+            version: cleanVersion,
+            versionSpec: version,
+            ecosystem: 'pypi',
+            file: filePath,
+            isDev: true,
+            isPinned: true,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    // Invalid JSON, skip
+  }
+  
+  return dependencies;
 }
 
 function parseCargoToml(content: string, filePath: string): Dependency[] {
