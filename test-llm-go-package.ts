@@ -6,6 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { parseTestLLMOptions } from './test-llm-options.js';
 import { formatTriageResults } from './src/supply-chain/llm/tools.js';
 import { createChatModel } from './src/supply-chain/llm/client.js';
 import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-chain/nodes/primary-analysis.js';
@@ -52,6 +53,8 @@ func Enabled() bool { return true }
     } satisfies PackageSource,
   },
 ];
+
+const llmOptions = parseTestLLMOptions('test-llm-go-package.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {
@@ -102,38 +105,32 @@ async function scanTarget(target: typeof TARGETS[0]) {
     console.log(`  ┌── ${entry.filePath} (score: ${entry.score})`);
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
   let findingsCount = 0;
-  if (apiKey) {
-    console.log(`  🤖 Running production package analysis on ${filesToInvestigate.length} file(s)...\n`);
-    const chatModel = createChatModel({
-      apiKey,
-      model: 'anthropic/claude-sonnet-4-5',
-      provider: 'openrouter',
-    });
+  console.log(`  🤖 Running production package analysis on ${filesToInvestigate.length} file(s)...\n`);
+  const chatModel = createChatModel({
+    apiKey: llmOptions.apiKey,
+    model: llmOptions.model,
+    provider: llmOptions.provider,
+  });
 
-    const { findings } = await analyzePackageWithModel(
-      buildFakeMetadata(target.version),
-      target.source,
-      chatModel,
-      false
-    );
-    findingsCount = findings.length;
+  const { findings } = await analyzePackageWithModel(
+    buildFakeMetadata(target.version),
+    target.source,
+    chatModel,
+    false
+  );
+  findingsCount = findings.length;
 
-    console.log(`\n  📋 Production analysis reported ${findings.length} finding(s)`);
-    for (const finding of findings) {
-      console.log(`    [${finding.severity}] ${finding.category} — ${finding.title}`);
-      console.log(`    confidence: ${Math.round(finding.confidence * 100)}% | ${finding.description.slice(0, 120)}`);
-    }
-
-    assert(
-      findings.length > 0,
-      `Expected at least one LLM finding for ${target.label}, but production analysis returned none`
-    );
-  } else {
-    console.log('  ℹ️  Set OPENROUTER_API_KEY to run LLM analysis on flagged files.');
-    console.log(`  ℹ️  ${filesToInvestigate.length} file(s) would be analyzed .`);
+  console.log(`\n  📋 Production analysis reported ${findings.length} finding(s)`);
+  for (const finding of findings) {
+    console.log(`    [${finding.severity}] ${finding.category} — ${finding.title}`);
+    console.log(`    confidence: ${Math.round(finding.confidence * 100)}% | ${finding.description.slice(0, 120)}`);
   }
+
+  assert(
+    findings.length > 0,
+    `Expected at least one LLM finding for ${target.label}, but production analysis returned none`
+  );
 
   return {
     triageCount: filesToInvestigate.length,

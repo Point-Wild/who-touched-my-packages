@@ -45,7 +45,7 @@ export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export interface SupplyChainFinding {
   packageName: string;
   packageVersion: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   category: ThreatCategory;
   severity: Severity;
   confidence: number;
@@ -59,7 +59,7 @@ export interface SupplyChainFinding {
 export interface PackageFetchError {
   packageName: string;
   packageVersion?: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   stage: 'metadata' | 'source';
   message: string;
   statusCode?: number;
@@ -97,7 +97,7 @@ export interface SupplyChainOptions {
 
 export interface PackageMetadata {
   name: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   latestVersion: string;
   /** The version published immediately before latestVersion (npm only). Used to compute version diffs. */
   previousVersion?: string;
@@ -116,7 +116,7 @@ export interface PackageMetadata {
 
 export interface PackageSource {
   name: string;
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   version: string;
   /** Entry point file content (index.js, __init__.py, etc.) */
   entryPoint?: string;

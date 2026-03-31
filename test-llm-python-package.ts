@@ -7,6 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { parseTestLLMOptions } from './test-llm-options.js';
 import { downloadAndExtractTarGz } from './src/supply-chain/registry/tarball.js';
 import { formatTriageResults } from './src/supply-chain/llm/tools.js';
 import { createChatModel } from './src/supply-chain/llm/client.js';
@@ -23,6 +24,8 @@ const TARGETS = [
     url: 'https://files.pythonhosted.org/packages/f6/2c/731b614e6cee0bca1e010a36fd381fba69ee836fe3cb6753ba23ef2b9601/litellm-1.82.8.tar.gz',
   },
 ];
+
+const llmOptions = parseTestLLMOptions('test-llm-python-package.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {
@@ -106,14 +109,13 @@ async function scanTarget(target: typeof TARGETS[0]) {
   }
 
   // LLM analysis if API key provided and files cross threshold
-  const apiKey = process.env.OPENROUTER_API_KEY;
   let findingsCount = 0;
-  if (apiKey && filesToInvestigate.length > 0) {
+  if (filesToInvestigate.length > 0) {
     console.log(`  🤖 Running production package analysis on ${filesToInvestigate.length} file(s)...\n`);
     const chatModel = createChatModel({
-      apiKey,
-      model: 'anthropic/claude-sonnet-4-5',
-      provider: 'openrouter',
+      apiKey: llmOptions.apiKey,
+      model: llmOptions.model,
+      provider: llmOptions.provider,
     });
     const meta = buildFakeMetadata(target.version);
     const { findings } = await analyzePackageWithModel(meta, source, chatModel, false);
@@ -129,9 +131,6 @@ async function scanTarget(target: typeof TARGETS[0]) {
       findings.length > 0,
       `Expected at least one LLM finding for ${target.label}, but production analysis returned none`
     );
-  } else if (!apiKey) {
-    console.log('  ℹ️  Set OPENROUTER_API_KEY to run LLM analysis on flagged files.');
-    console.log(`  ℹ️  ${filesToInvestigate.length} file(s) would be analyzed.`);
   }
 
   return {

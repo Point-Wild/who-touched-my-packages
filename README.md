@@ -1,6 +1,6 @@
 # 🛡️ Who Touched My Packages?
 
-A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities in your projects. Supports npm (JavaScript/TypeScript) and PyPI (Python) packages with a gorgeous terminal UI.
+A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities in your projects. Supports npm, PyPI, Cargo, Go modules, and RubyGems with a gorgeous terminal UI.
 
 ## ✨ Features
 
@@ -265,13 +265,22 @@ The repo includes several ad hoc test harnesses for vulnerability detection and 
 
 ### Run the core test suite
 
-This runs the stable local suite:
-- TypeScript typecheck
-- Known-vulnerable package checks for npm, PyPI, Go, and Rust
-- Synthetic malicious package tests for npm, PyPI, Go, and Rust
+These aggregate commands are available:
+- `npm run test:all` runs both the static and LLM-backed suites
+- `npm run test:all:static` runs typecheck, efficacy, and known-vulnerable package checks
+- `npm run test:all:llm` runs the LLM-backed malicious package fixtures only
 
 ```bash
 npm run test:all
+npm run test:all:static
+npm run test:all:llm
+```
+
+To pass a specific provider/model through the aggregate LLM runner:
+
+```bash
+npm run test:all:llm -- --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
+npm run test:all:llm --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
 ```
 
 ### Run individual CVE/advisory checks
@@ -283,17 +292,31 @@ npm run test:cve:npm
 npm run test:cve:python
 npm run test:cve:go
 npm run test:cve:rust
+npm run test:cve:ruby
 ```
 
 ### Run LLM-backed package analysis tests
 
-These require `OPENROUTER_API_KEY`.
+These require the provider-specific API key for the selected model:
+- `ANTHROPIC_API_KEY` for Anthropic
+- `OPENAI_API_KEY` for OpenAI
+- `GOOGLE_API_KEY` for Gemini
+- `OPENROUTER_API_KEY` for OpenRouter
 
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:npm
 OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:python
 OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:go
 OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:rust
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:ruby
+```
+
+You can also override the LLM provider/model per test:
+
+```bash
+OPENAI_API_KEY=... npm run test:llm:npm -- --llm-provider openai --supply-chain-model gpt-5.4
+ANTHROPIC_API_KEY=... npm run test:llm:python -- --llm-provider anthropic --supply-chain-model claude-sonnet-4-6
+OPENROUTER_API_KEY=... npm run test:llm:rust --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
 ```
 
 ### Run specialized test harnesses

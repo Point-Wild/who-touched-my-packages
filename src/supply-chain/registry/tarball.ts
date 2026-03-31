@@ -1,5 +1,4 @@
-import { createGunzip } from 'node:zlib';
-import { inflateRawSync } from 'node:zlib';
+import { createGunzip, gunzipSync, inflateRawSync } from 'node:zlib';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { unlink, rmdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,6 +9,24 @@ import { pipeline } from 'node:stream/promises';
 export interface TarExtractResult {
   fileList: string[];
   fileContents: Record<string, string>;
+}
+
+async function readResponseBuffer(response: Response): Promise<Buffer> {
+  const body = response.body;
+  if (!body) {
+    throw new Error('Empty response body');
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of Readable.fromWeb(body)) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks);
+}
+
+function gunzipBuffer(buffer: Buffer): Buffer {
+  return gunzipSync(buffer);
 }
 
 /**
@@ -46,17 +63,30 @@ export async function downloadAndExtractZip(
   response: Response,
   textFilePattern: RegExp
 ): Promise<TarExtractResult> {
-  const body = response.body;
-  if (!body) {
-    throw new Error('Empty response body');
+  return parseZip(await readResponseBuffer(response), textFilePattern);
+}
+
+export async function downloadAndExtractGem(
+  response: Response,
+  textFilePattern: RegExp
+): Promise<TarExtractResult> {
+  const gemBuffer = await readResponseBuffer(response);
+  const outer = parseTar(gemBuffer, /.^/);
+  const dataTarKey = outer.fileList.find(name => name === 'data.tar.gz' || name === 'data.tar');
+  if (!dataTarKey) {
+    return { fileList: [], fileContents: {} };
   }
 
-  const chunks: Buffer[] = [];
-  for await (const chunk of Readable.fromWeb(body)) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const outerOffsetData = extractTarEntry(gemBuffer, dataTarKey);
+  if (!outerOffsetData) {
+    return { fileList: [], fileContents: {} };
   }
 
-  return parseZip(Buffer.concat(chunks), textFilePattern);
+  const dataTar = dataTarKey.endsWith('.gz')
+    ? gunzipBuffer(outerOffsetData)
+    : outerOffsetData;
+
+  return parseTar(dataTar, textFilePattern);
 }
 
 async function decompressFile(filePath: string): Promise<Buffer> {
@@ -107,6 +137,29 @@ function parseTar(
   }
 
   return { fileList, fileContents };
+}
+
+function extractTarEntry(decompressed: Buffer, targetName: string): Buffer | null {
+  let offset = 0;
+
+  while (offset < decompressed.length - 512) {
+    const header = decompressed.subarray(offset, offset + 512);
+    if (header.every(b => b === 0)) break;
+
+    const name = header.subarray(0, 100).toString('utf-8').replace(/\0/g, '').trim();
+    const sizeOctal = header.subarray(124, 136).toString('utf-8').replace(/\0/g, '').trim();
+    const size = parseInt(sizeOctal, 8) || 0;
+
+    offset += 512;
+
+    if (name === targetName) {
+      return decompressed.subarray(offset, offset + size);
+    }
+
+    offset += Math.ceil(size / 512) * 512;
+  }
+
+  return null;
 }
 
 function parseZip(

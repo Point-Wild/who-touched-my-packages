@@ -168,6 +168,11 @@ const HIGH_VALUE_PATH_PATTERNS = [
   /\.gitlab-ci/i,
   /Makefile/i,
   /setup\.(py|cfg)$/i,
+  /extconf\.rb$/i,
+  /\.gemspec$/i,
+  /Gemfile$/i,
+  /Gemfile\.lock$/i,
+  /Rakefile$/i,
   /pyproject\.toml$/i,
   /Cargo\.toml$/i,
   /go\.mod$/i,
@@ -184,6 +189,7 @@ const HIGH_VALUE_PATH_PATTERNS = [
   /install-script/i,
   /locust/i,
   /\.py$/i,
+  /\.rb$/i,
 ];
 
 /**

@@ -4,14 +4,15 @@ import { fetchCratesMetadata, fetchCratesSource } from '../registry/crates.js';
 import { fetchGoMetadata, fetchGoSource } from '../registry/golang.js';
 import { fetchNpmMetadata, fetchNpmSource } from '../registry/npm.js';
 import { fetchPypiMetadata, fetchPypiSource } from '../registry/pypi.js';
+import { fetchRubyMetadata, fetchRubySource } from '../registry/ruby.js';
 import { describeFetchError, pMap, depKey } from '../utils.js';
 
 type SupplyChainDependency = Dependency & {
-  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
 };
 
 function isSupplyChainDependency(dep: Dependency): dep is SupplyChainDependency {
-  return dep.ecosystem === 'npm' || dep.ecosystem === 'pypi' || dep.ecosystem === 'cargo' || dep.ecosystem === 'go';
+  return dep.ecosystem === 'npm' || dep.ecosystem === 'pypi' || dep.ecosystem === 'cargo' || dep.ecosystem === 'go' || dep.ecosystem === 'ruby';
 }
 
 /**
@@ -66,7 +67,9 @@ export async function fetchMetadataNode(
             ? await fetchPypiMetadata(dep.name)
             : dep.ecosystem === 'cargo'
               ? await fetchCratesMetadata(dep.name)
-              : await fetchGoMetadata(dep.name);
+              : dep.ecosystem === 'go'
+                ? await fetchGoMetadata(dep.name)
+                : await fetchRubyMetadata(dep.name);
 
         if (meta) {
           metadata.set(key, meta);
@@ -100,7 +103,9 @@ export async function fetchMetadataNode(
             ? await fetchPypiSource(dep.name, dep.version)
             : dep.ecosystem === 'cargo'
               ? await fetchCratesSource(dep.name, dep.version)
-              : await fetchGoSource(dep.name, dep.version);
+              : dep.ecosystem === 'go'
+                ? await fetchGoSource(dep.name, dep.version)
+                : await fetchRubySource(dep.name, dep.version);
 
         if (source) {
           sources.set(key, source);

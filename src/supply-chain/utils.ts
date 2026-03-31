@@ -58,7 +58,7 @@ export function resolveApiKey(optionsKey?: string, provider?: LLMProvider, model
   if (envKey) return envKey;
 
   throw new Error(
-    `No API key found for ${config.name}. Set one of:\n` +
+    `No API key found for ${config.name} provider: ${provider}. Set one of:\n` +
     `  * Set ${config.envVar} environment variable\n\n` +
     `All supported providers and their env vars:\n` +
     Object.entries(PROVIDERS).map(([id, c]) => `  • ${id}: ${c.envVar}`).join('\n')
