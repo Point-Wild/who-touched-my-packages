@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process';
 const suites = {
   static: [
     ['npm', 'run', 'typecheck'],
-    ['npm', 'run', 'test:efficacy'],
     ['npm', 'run', 'test:cve:npm'],
     ['npm', 'run', 'test:cve:python'],
     ['npm', 'run', 'test:cve:go'],

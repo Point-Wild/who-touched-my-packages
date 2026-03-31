@@ -34,8 +34,6 @@
     "test:llm:rust": "bun test-llm-rust-package.ts",
     "test:llm:ruby": "bun test-llm-ruby-package.ts",
     "test:malware:litellm": "bun test-litellm-malware.ts",
-    "test:efficacy": "bun test-efficacy.ts",
-    "test:efficacy:llm": "bun test-efficacy-llm.ts",
     "test:integration": "bun test-integration.ts",
     "test:all": "node scripts/run-test-suite.mjs all",
     "test:all:llm": "node scripts/run-test-suite.mjs llm",

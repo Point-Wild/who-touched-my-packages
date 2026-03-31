@@ -267,7 +267,7 @@ The repo includes several ad hoc test harnesses for vulnerability detection and 
 
 These aggregate commands are available:
 - `npm run test:all` runs both the static and LLM-backed suites
-- `npm run test:all:static` runs typecheck, efficacy, and known-vulnerable package checks
+- `npm run test:all:static` runs typecheck, and known-vulnerable package checks
 - `npm run test:all:llm` runs the LLM-backed malicious package fixtures only
 
 ```bash
@@ -322,8 +322,6 @@ OPENROUTER_API_KEY=... npm run test:llm:rust --llm-provider openrouter --supply-
 ### Run specialized test harnesses
 
 ```bash
-npm run test:efficacy
-OPENROUTER_API_KEY=sk-or-v1-... npm run test:efficacy:llm
 npm run test:malware:litellm
 npm run test:integration
 ```
