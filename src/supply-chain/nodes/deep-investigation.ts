@@ -68,6 +68,10 @@ export async function deepInvestigationNode(
   );
 
   const confirmed = investigated.filter((f): f is SupplyChainFinding => f !== null);
+  if (confirmed.length === 0 && toInvestigate.length > 0) {
+    return findings;
+  }
+
   return [...confirmed, ...passThrough];
 }
 

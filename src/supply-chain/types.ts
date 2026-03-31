@@ -45,7 +45,7 @@ export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export interface SupplyChainFinding {
   packageName: string;
   packageVersion: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   category: ThreatCategory;
   severity: Severity;
   confidence: number;
@@ -56,8 +56,18 @@ export interface SupplyChainFinding {
   deepInvestigated: boolean;
 }
 
+export interface PackageFetchError {
+  packageName: string;
+  packageVersion?: string;
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+  stage: 'metadata' | 'source';
+  message: string;
+  statusCode?: number;
+}
+
 export interface SupplyChainReport {
   findings: SupplyChainFinding[];
+  fetchErrors: PackageFetchError[];
   summary: {
     packagesAnalyzed: number;
     packagesWithFindings: number;
@@ -77,8 +87,7 @@ export interface SupplyChainOptions {
   model?: string;
   provider?: LLMProvider;
   concurrency?: number;
-  /** Transitive dependency depth to analyze. 1 = direct deps only (default). */
-  depth?: number;
+  verbose?: boolean;
   /** Hard cap on number of packages analyzed. 0 = unlimited (default). */
   maxPackages?: number;
   dryRun?: boolean;
@@ -86,7 +95,7 @@ export interface SupplyChainOptions {
 
 export interface PackageMetadata {
   name: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   latestVersion: string;
   /** The version published immediately before latestVersion (npm only). Used to compute version diffs. */
   previousVersion?: string;
@@ -105,7 +114,7 @@ export interface PackageMetadata {
 
 export interface PackageSource {
   name: string;
-  ecosystem: 'npm' | 'pypi';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   version: string;
   /** Entry point file content (index.js, __init__.py, etc.) */
   entryPoint?: string;
@@ -127,6 +136,7 @@ export interface AnalysisState {
   dependencies: Dependency[];
   metadata: Map<string, PackageMetadata>;
   sources: Map<string, PackageSource>;
+  fetchErrors: PackageFetchError[];
   primaryFindings: SupplyChainFinding[];
   deepFindings: SupplyChainFinding[];
   result?: SupplyChainReport;

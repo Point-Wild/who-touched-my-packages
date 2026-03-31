@@ -58,7 +58,7 @@ export class OSVDataSource extends DataSource {
     const queries: OSVQuery[] = dependencies.map(dep => ({
       package: {
         name: dep.name,
-        ecosystem: dep.ecosystem === 'npm' ? 'npm' : dep.ecosystem === 'cargo' ? 'crates.io' : dep.ecosystem === 'go' ? 'Go' : dep.ecosystem === 'ruby' ? 'RubyGems' : 'PyPI',
+        ecosystem: this.mapEcosystem(dep.ecosystem),
       },
       version: dep.version !== '*' ? dep.version : undefined,
     }));
@@ -99,6 +99,21 @@ export class OSVDataSource extends DataSource {
       return vulnerabilities;
     } catch (error) {
       return [];
+    }
+  }
+
+  private mapEcosystem(ecosystem: Dependency['ecosystem']): string {
+    switch (ecosystem) {
+      case 'npm':
+        return 'npm';
+      case 'pypi':
+        return 'PyPI';
+      case 'cargo':
+        return 'crates.io';
+      case 'go':
+        return 'Go';
+      case 'ruby':
+        return 'RubyGems';
     }
   }
   

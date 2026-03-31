@@ -1,6 +1,6 @@
 # 🛡️ Who Touched My Packages?
 
-A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities in your projects. Supports npm (JavaScript/TypeScript) and PyPI (Python) packages with a gorgeous terminal UI.
+A beautiful, fast CLI tool for auditing dependencies and finding vulnerabilities in your projects. Supports npm, PyPI, Cargo, Go modules, and RubyGems with a gorgeous terminal UI.
 
 ## ✨ Features
 
@@ -259,6 +259,79 @@ Currently integrated:
 
 See [datasources.md](./datasources.md) for details on all current and planned data sources.
 
+## 🧪 Testing
+
+The repo includes several ad hoc test harnesses for vulnerability detection and supply chain analysis.
+
+### Run the core test suite
+
+These aggregate commands are available:
+- `npm run test:all` runs both the static and LLM-backed suites
+- `npm run test:all:static` runs typecheck, and known-vulnerable package checks
+- `npm run test:all:llm` runs the LLM-backed malicious package fixtures only
+
+```bash
+npm run test:all
+npm run test:all:static
+npm run test:all:llm
+```
+
+To pass a specific provider/model through the aggregate LLM runner:
+
+```bash
+npm run test:all:llm -- --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
+npm run test:all:llm --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
+```
+
+For the CLI scanner itself, use `--package-depth` to control how many dependency levels are included in graph building and supply-chain input:
+
+```bash
+wtmp --supply-chain --package-depth 2
+```
+
+### Run individual CVE/advisory checks
+
+These test `checker.checkDependencies(...)` directly against OSV-backed vulnerable package versions.
+
+```bash
+npm run test:cve:npm
+npm run test:cve:python
+npm run test:cve:go
+npm run test:cve:rust
+npm run test:cve:ruby
+```
+
+### Run LLM-backed package analysis tests
+
+These require the provider-specific API key for the selected model:
+- `ANTHROPIC_API_KEY` for Anthropic
+- `OPENAI_API_KEY` for OpenAI
+- `GOOGLE_API_KEY` for Gemini
+- `OPENROUTER_API_KEY` for OpenRouter
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:npm
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:python
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:go
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:rust
+OPENROUTER_API_KEY=sk-or-v1-... npm run test:llm:ruby
+```
+
+You can also override the LLM provider/model per test:
+
+```bash
+OPENAI_API_KEY=... npm run test:llm:npm -- --llm-provider openai --supply-chain-model gpt-5.4
+ANTHROPIC_API_KEY=... npm run test:llm:python -- --llm-provider anthropic --supply-chain-model claude-sonnet-4-6
+OPENROUTER_API_KEY=... npm run test:llm:rust --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
+```
+
+### Run specialized test harnesses
+
+```bash
+npm run test:malware:litellm
+npm run test:integration
+```
+
 ## � Provenance Verification
 
 The tool automatically verifies package provenance to help ensure supply chain security. This feature checks whether packages have cryptographic attestations proving their build integrity and origin.
@@ -331,8 +404,9 @@ This will show exactly which packages have provenance and what the registry resp
 - `OPENAI_API_KEY` - API key for OpenAI LLM provider (supply chain analysis)
 - `GOOGLE_API_KEY` - API key for Google Gemini LLM provider (supply chain analysis)
 - `OPENROUTER_API_KEY` - API key for OpenRouter LLM provider (supply chain analysis)
-- `SC_VERBOSE` - Set to `1` for detailed supply chain analysis logging (triage scores, tool calls)
-- `SC_MAX_LLM_FILES` - Maximum files per package sent to LLM (default: `30`)
+- `SC_MAX_LLM_FILES` - Maximum files per package sent to LLM (default: `10`)
+
+Use `--verbose` for detailed supply chain analysis logging (triage scores, tool calls).
 
 ### Supply Chain LLM Providers
 

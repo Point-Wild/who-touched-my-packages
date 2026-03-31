@@ -1,5 +1,47 @@
 import { PROVIDERS, DEFAULT_PROVIDER, inferProvider, type LLMProvider } from './llm/models.js';
 
+export class RegistryFetchError extends Error {
+  statusCode?: number;
+
+  constructor(message: string, statusCode?: number) {
+    super(message);
+    this.name = 'RegistryFetchError';
+    this.statusCode = statusCode;
+  }
+}
+
+export function createRegistryFetchError(
+  ecosystemLabel: string,
+  packageName: string,
+  statusCode: number,
+  version?: string
+): RegistryFetchError {
+  const target = version ? `${packageName}@${version}` : packageName;
+  if (statusCode === 404 || statusCode === 410) {
+    return new RegistryFetchError(
+      `${ecosystemLabel} package ${target} was not found or may have been removed (HTTP ${statusCode})`,
+      statusCode
+    );
+  }
+
+  return new RegistryFetchError(
+    `${ecosystemLabel} registry request failed for ${target} (HTTP ${statusCode})`,
+    statusCode
+  );
+}
+
+export function describeFetchError(error: unknown): { message: string; statusCode?: number } {
+  if (error instanceof RegistryFetchError) {
+    return { message: error.message, statusCode: error.statusCode };
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message };
+  }
+
+  return { message: String(error) };
+}
+
 /**
  * Resolve the LLM API key from (in priority order):
  * 1. options.apiKey passed directly
@@ -16,7 +58,7 @@ export function resolveApiKey(optionsKey?: string, provider?: LLMProvider, model
   if (envKey) return envKey;
 
   throw new Error(
-    `No API key found for ${config.name}. Set one of:\n` +
+    `No API key found for ${config.name} provider: ${provider}. Set one of:\n` +
     `  * Set ${config.envVar} environment variable\n\n` +
     `All supported providers and their env vars:\n` +
     Object.entries(PROVIDERS).map(([id, c]) => `  • ${id}: ${c.envVar}`).join('\n')

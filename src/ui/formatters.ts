@@ -96,7 +96,7 @@ export function formatFileList(files: DependencyFile[]): string {
   output += theme.dim('─'.repeat(40)) + '\n';
   
   for (const file of files) {
-    const icon = file.type === 'package.json' ? icons.package : icons.file;
+    const icon = file.type === 'requirements.txt' ? icons.file : icons.package;
     output += theme.dim(`${icon} ${file.relativePath}\n`);
   }
   

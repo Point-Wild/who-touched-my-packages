@@ -1,23 +1,49 @@
 import { useMemo, useState } from 'react';
-import type { ReportData } from '../types';
+import type { FinalReport } from '../types';
 import { ExportButton } from './ExportButton';
 
 interface VulnerabilitiesTabProps {
-  data: ReportData;
+  data: FinalReport;
+}
+
+interface TabFinding {
+  id: string;
+  packageName: string;
+  packageVersion: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  title: string;
+  references: string[];
+  cvss?: number;
+  source: string;
+  filePaths: string[];
 }
 
 export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
+  const reportData = data.reportData;
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
 
   const vulnerabilitiesWithPaths = useMemo(() => {
-    return data.auditResult.vulnerabilities.map(vuln => {
-      const filePaths = data.dependencies
+    const staticFindings: TabFinding[] = reportData.auditResult.vulnerabilities.map(vuln => {
+      const filePaths = reportData.dependencies
         .filter(dep => dep.name === vuln.packageName)
         .map(dep => dep.file);
       return { ...vuln, filePaths: [...new Set(filePaths)] };
     });
-  }, [data]);
+
+    const supplyChainFindings: TabFinding[] = (data.supplyChainReport?.findings ?? []).map(finding => ({
+      id: finding.category,
+      packageName: finding.packageName,
+      packageVersion: finding.packageVersion,
+      severity: finding.severity,
+      title: finding.title,
+      references: [],
+      source: 'LLM',
+      filePaths: [],
+    }));
+
+    return [...staticFindings, ...supplyChainFindings];
+  }, [data.supplyChainReport?.findings, reportData]);
 
   const filteredVulns = useMemo(() => {
     return vulnerabilitiesWithPaths.filter(vuln => {
@@ -44,7 +70,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
     { key: 'references' as const, label: 'References' },
   ];
 
-  if (data.auditResult.vulnerabilities.length === 0) {
+  if (vulnerabilitiesWithPaths.length === 0) {
     return (
       <div className="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -176,16 +202,20 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                     )}
                   </td>
                   <td>
-                    {vuln.filePaths.map((path, i) => (
-                      <div key={i}>
-                        <a
-                          href={`vscode://file${path}`}
-                          className="vscode-link"
-                        >
-                          {path}
-                        </a>
-                      </div>
-                    ))}
+                    {vuln.filePaths.length > 0 ? (
+                      vuln.filePaths.map((path, i) => (
+                        <div key={i}>
+                          <a
+                            href={`vscode://file${path}`}
+                            className="vscode-link"
+                          >
+                            {path}
+                          </a>
+                        </div>
+                      ))
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                    )}
                   </td>
                 </tr>
               ))}

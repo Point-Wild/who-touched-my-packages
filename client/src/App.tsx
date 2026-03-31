@@ -5,11 +5,11 @@ import { OverviewTab } from './components/OverviewTab';
 import { PinningTab } from './components/PinningTab';
 import { UnresolvedDependenciesTab } from './components/UnresolvedDependenciesTab';
 import { VulnerabilitiesTab } from './components/VulnerabilitiesTab';
-import type { ReportData } from './types';
+import type { FinalReport } from './types';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [data, setData] = useState<ReportData | null>(null);
+  const [data, setData] = useState<FinalReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,9 +27,9 @@ export function App() {
   }, []);
 
   const getRepoName = () => {
-    if (!data?.repositoryUrl) return null;
+    if (!data?.reportData.repositoryUrl) return null;
     try {
-      const url = data.repositoryUrl;
+      const url = data.reportData.repositoryUrl;
       const githubPattern = /github\.com[:/]([^/]+\/[^/]+?)(\.git)?$/;
       const match = url.match(githubPattern);
       if (match) return match[1];
@@ -137,13 +137,13 @@ export function App() {
       <div className="header">
         <h1>🛡️ Who Touched My Packages?{repoName ? ` - ${repoName}` : ''}</h1>
         <div className="subtitle">
-          Security Audit Report • {new Date(data.auditResult.timestamp).toLocaleString()}
+          Security Audit Report • {new Date(data.reportData.auditResult.timestamp).toLocaleString()}
         </div>
         <div className="subtitle" style={{ marginTop: '2px' }}>
-          {data.repositoryUrl ? (
-            <>Repository: <a href={data.repositoryUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-blue)' }}>{data.repositoryUrl}</a></>
+          {data.reportData.repositoryUrl ? (
+            <>Repository: <a href={data.reportData.repositoryUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-blue)' }}>{data.reportData.repositoryUrl}</a></>
           ) : (
-            <>Scan Path: {data.scanPath}</>
+            <>Scan Path: {data.reportData.scanPath}</>
           )}
         </div>
         <div className="subtitle" style={{ marginTop: '2px' }}>
@@ -176,12 +176,12 @@ export function App() {
         >
           📌 Pinning Issues
         </button>
-        {data.unresolvedDependencies && data.unresolvedDependencies.length > 0 && (
+        {data.reportData.unresolvedDependencies && data.reportData.unresolvedDependencies.length > 0 && (
           <button
             className={`tab ${activeTab === 'unresolved' ? 'active' : ''}`}
             onClick={() => setActiveTab('unresolved')}
           >
-            ❓ Unresolved ({data.unresolvedDependencies.length})
+            ❓ Unresolved ({data.reportData.unresolvedDependencies.length})
           </button>
         )}
         <button
@@ -208,7 +208,7 @@ export function App() {
         <PinningTab data={data} />
       </div>
 
-      {data.unresolvedDependencies && data.unresolvedDependencies.length > 0 && (
+      {data.reportData.unresolvedDependencies && data.reportData.unresolvedDependencies.length > 0 && (
         <div className={`tab-content ${activeTab === 'unresolved' ? 'active' : ''}`}>
           <UnresolvedDependenciesTab data={data} />
         </div>

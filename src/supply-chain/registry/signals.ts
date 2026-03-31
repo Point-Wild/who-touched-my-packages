@@ -87,8 +87,15 @@ function levenshtein(a: string, b: string): number {
  * Check if a package name is a likely typosquat of a well-known package.
  * Returns the candidate it resembles, or null if no match.
  */
-export function computeTyposquatCandidate(name: string, ecosystem: 'npm' | 'pypi'): string | null {
-  const list = ecosystem === 'npm' ? TOP_NPM : TOP_PYPI;
+export function computeTyposquatCandidate(
+  name: string,
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby'
+): string | null {
+  const list = ecosystem === 'npm'
+    ? TOP_NPM
+    : ecosystem === 'pypi'
+      ? TOP_PYPI
+      : [];
   // For scoped npm packages (@org/pkg), compare only the local part
   const normalized = name.startsWith('@')
     ? (name.split('/')[1] ?? name)

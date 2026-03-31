@@ -34,7 +34,7 @@ bun run build
 
 The client expects the following API endpoints from the static server:
 
-- `GET /api/data` - Returns the complete report data (ReportData JSON)
+- `GET /api/data` - Returns the complete aggregated report JSON
 - `GET /api/file?path=<filepath>` - Returns the content of a dependency file
 
 ## Building

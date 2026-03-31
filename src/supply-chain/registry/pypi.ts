@@ -1,4 +1,5 @@
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
+import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
 import {
   computeTyposquatCandidate,
@@ -11,7 +12,7 @@ const STATS_BASE = 'https://pypistats.org/api/packages';
 
 export async function fetchPypiMetadata(packageName: string): Promise<PackageMetadata | null> {
   const res = await fetch(`${PYPI_BASE}/${packageName}/json`);
-  if (!res.ok) return null;
+  if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status);
 
   const data = await res.json() as any;
   const info = data.info ?? {};
@@ -103,7 +104,7 @@ export async function fetchPypiSource(
   version: string
 ): Promise<PackageSource | null> {
   const res = await fetch(`${PYPI_BASE}/${packageName}/${version}/json`);
-  if (!res.ok) return null;
+  if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status, version);
 
   const data = await res.json() as any;
   const releases = data.urls ?? [];
@@ -124,7 +125,7 @@ export async function fetchPypiSource(
   }
 
   const tarRes = await fetch(sdist.url);
-  if (!tarRes.ok) return null;
+  if (!tarRes.ok) throw createRegistryFetchError('PyPI', packageName, tarRes.status, version);
 
   const PYPI_TEXT_PATTERN = /\.(py|js|ts|sh|json|yml|yaml|toml|cfg|ini|txt|md|pth)$/i;
   const { fileList, fileContents } = await downloadAndExtractTarGz(tarRes, PYPI_TEXT_PATTERN);
@@ -168,4 +169,3 @@ export async function fetchPypiSource(
     suspiciousFiles,
   };
 }
-

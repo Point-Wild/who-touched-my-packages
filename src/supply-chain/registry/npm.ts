@@ -1,4 +1,5 @@
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
+import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
 import {
   computeTyposquatCandidate,
@@ -17,7 +18,8 @@ const DOWNLOADS_BASE = 'https://api.npmjs.org/downloads/point/last-week';
 export async function fetchNpmPackageDoc(packageName: string): Promise<any | null> {
   const encoded = encodeURIComponent(packageName);
   const res = await fetch(`${REGISTRY_BASE}/${encoded}`);
-  return res.ok ? (res.json() as Promise<any>) : null;
+  if (!res.ok) throw createRegistryFetchError('npm', packageName, res.status);
+  return res.json() as Promise<any>;
 }
 
 export async function fetchNpmMetadata(packageName: string): Promise<PackageMetadata | null> {
@@ -116,11 +118,13 @@ export async function fetchNpmSource(
 ): Promise<PackageSource | null> {
   const encoded = encodeURIComponent(packageName);
   const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
-  if (!metaRes.ok) return null;
+  if (!metaRes.ok) throw createRegistryFetchError('npm', packageName, metaRes.status, version);
 
   const meta = await metaRes.json() as any;
   const tarballUrl = meta.dist?.tarball;
-  if (!tarballUrl) return null;
+  if (!tarballUrl) {
+    throw new Error(`npm package ${packageName}@${version} does not expose a tarball URL`);
+  }
 
   const scripts = meta.scripts ?? {};
   const installScripts: Record<string, string> = {};
@@ -132,7 +136,7 @@ export async function fetchNpmSource(
 
   // Download and extract the tarball
   const tarRes = await fetch(tarballUrl);
-  if (!tarRes.ok) return null;
+  if (!tarRes.ok) throw createRegistryFetchError('npm', packageName, tarRes.status, version);
 
   const NPM_TEXT_PATTERN = /\.(js|ts|mjs|cjs|py|sh|json|yml|yaml|toml|cfg|ini|txt|md)$/i;
   const { fileList, fileContents } = await downloadAndExtractTarGz(tarRes, NPM_TEXT_PATTERN);
@@ -212,4 +216,3 @@ export async function fetchNpmSource(
     newFilesInVersion,
   };
 }
-

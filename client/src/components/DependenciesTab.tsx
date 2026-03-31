@@ -1,23 +1,24 @@
 import { useMemo, useState } from 'react';
-import type { ReportData } from '../types';
+import type { FinalReport } from '../types';
 import { ExportButton } from './ExportButton';
 
 interface DependenciesTabProps {
-  data: ReportData;
+  data: FinalReport;
 }
 
 export function DependenciesTab({ data }: DependenciesTabProps) {
+  const reportData = data.reportData;
   const [searchTerm, setSearchTerm] = useState('');
   const [showVulnerableOnly, setShowVulnerableOnly] = useState(false);
   const [showNoProvenanceOnly, setShowNoProvenanceOnly] = useState(false);
 
   const vulnerablePackages = useMemo(() => {
-    return new Set(data.auditResult.vulnerabilities.map(v => v.packageName));
-  }, [data]);
+    return new Set(reportData.auditResult.vulnerabilities.map(v => v.packageName));
+  }, [reportData]);
 
   const vulnerabilitySeverityMap = useMemo(() => {
     const map = new Map();
-    data.auditResult.vulnerabilities.forEach(vuln => {
+    reportData.auditResult.vulnerabilities.forEach(vuln => {
       const existing = map.get(vuln.packageName);
       const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, UNKNOWN: 4 };
       const currentOrder = severityOrder[vuln.severity] ?? 5;
@@ -28,10 +29,10 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
       }
     });
     return map;
-  }, [data]);
+  }, [reportData]);
 
   const filteredDeps = useMemo(() => {
-    const filtered = data.dependencies.filter(dep => {
+    const filtered = reportData.dependencies.filter(dep => {
       const matchesSearch = searchTerm === '' ||
         dep.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         dep.version.includes(searchTerm);
@@ -61,7 +62,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
 
       return a.name.localeCompare(b.name);
     });
-  }, [data.dependencies, searchTerm, showVulnerableOnly, showNoProvenanceOnly, vulnerablePackages, vulnerabilitySeverityMap]);
+  }, [reportData.dependencies, searchTerm, showVulnerableOnly, showNoProvenanceOnly, vulnerablePackages, vulnerabilitySeverityMap]);
 
   const depsForExport = useMemo(() => {
     return filteredDeps.map(dep => ({
@@ -83,7 +84,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
     { key: 'provenanceStatus' as const, label: 'Provenance' },
   ];
 
-  if (data.dependencies.length === 0) {
+  if (reportData.dependencies.length === 0) {
     return (
       <div className="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -231,7 +232,7 @@ export function DependenciesTab({ data }: DependenciesTabProps) {
       </div>
 
       <div style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-        Showing {filteredDeps.length} of {data.dependencies.length} dependencies
+        Showing {filteredDeps.length} of {reportData.dependencies.length} dependencies
       </div>
     </>
   );

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ReportData } from '../types';
+import type { FinalReport } from '../types';
 import { GraphView } from './graph/GraphView';
 
 interface GraphTabProps {
-  data: ReportData;
+  data: FinalReport;
 }
 
 interface GraphNode {
@@ -24,6 +24,7 @@ interface GraphEdge {
 }
 
 export function GraphTab({ data }: GraphTabProps) {
+  const reportData = data.reportData;
   const [layoutedGraph, setLayoutedGraph] = useState<{ nodes: any[]; edges: any[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,18 +48,18 @@ export function GraphTab({ data }: GraphTabProps) {
   }, [isFullscreen]);
 
   const vulnerablePackages = useMemo(() => {
-    return new Set(data.auditResult.vulnerabilities.map(v => v.packageName));
-  }, [data]);
+    return new Set(reportData.auditResult.vulnerabilities.map(v => v.packageName));
+  }, [reportData]);
 
   const packageFiles = useMemo(() => {
-    const files = new Set(data.dependencies.map(d => d.file));
+    const files = new Set(reportData.dependencies.map(d => d.file));
     return Array.from(files).sort();
-  }, [data.dependencies]);
+  }, [reportData.dependencies]);
 
   const { nodes, edges } = useMemo(() => {
     const filteredDeps = selectedFile === 'all' 
-      ? data.dependencies 
-      : data.dependencies.filter(d => d.file === selectedFile);
+      ? reportData.dependencies 
+      : reportData.dependencies.filter(d => d.file === selectedFile);
 
     const nodeMap = new Map<string, GraphNode>();
     const edgeList: GraphEdge[] = [];
@@ -81,10 +82,10 @@ export function GraphTab({ data }: GraphTabProps) {
       }
     });
 
-    if (data.dependencyEdges) {
+    if (reportData.dependencyEdges) {
       const nodeIds = new Set(nodeMap.keys());
       
-      data.dependencyEdges.forEach(edge => {
+      reportData.dependencyEdges.forEach(edge => {
         if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
           edgeList.push({
             source: edge.source,
@@ -98,7 +99,7 @@ export function GraphTab({ data }: GraphTabProps) {
     const nodes = Array.from(nodeMap.values());
 
     return { nodes, edges: edgeList };
-  }, [data.dependencies, data.dependencyEdges, selectedFile, vulnerablePackages]);
+  }, [reportData.dependencies, reportData.dependencyEdges, selectedFile, vulnerablePackages]);
 
   useEffect(() => {
     if (nodes.length === 0) {
@@ -147,7 +148,7 @@ export function GraphTab({ data }: GraphTabProps) {
     };
   }, [nodes, edges]);
 
-  if (data.dependencies.length === 0) {
+  if (reportData.dependencies.length === 0) {
     return (
       <div className="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,9 +185,9 @@ export function GraphTab({ data }: GraphTabProps) {
             onChange={(e) => setSelectedFile(e.target.value)}
             className="filter-select"
           >
-            <option value="all">All Files ({data.dependencies.length} dependencies)</option>
+            <option value="all">All Files ({reportData.dependencies.length} dependencies)</option>
             {packageFiles.map(file => {
-              const count = data.dependencies.filter(d => d.file === file).length;
+              const count = reportData.dependencies.filter(d => d.file === file).length;
               return (
                 <option key={file} value={file}>
                   {file} ({count} dependencies)

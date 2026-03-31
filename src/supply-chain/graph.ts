@@ -1,7 +1,7 @@
 import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { Dependency } from '../scanner/types.js';
-import type { PackageMetadata, PackageSource, SupplyChainFinding, SupplyChainReport } from './types.js';
+import type { PackageFetchError, PackageMetadata, PackageSource, SupplyChainFinding, SupplyChainReport } from './types.js';
 import { fetchMetadataNode } from './nodes/fetch-metadata.js';
 import { primaryAnalysisNode } from './nodes/primary-analysis.js';
 import { deepInvestigationNode } from './nodes/deep-investigation.js';
@@ -20,6 +20,10 @@ const AnalysisAnnotation = Annotation.Root({
   sources: Annotation<Map<string, PackageSource>>({
     reducer: (_prev, next) => next,
     default: () => new Map(),
+  }),
+  fetchErrors: Annotation<PackageFetchError[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
   }),
   primaryFindings: Annotation<SupplyChainFinding[]>({
     reducer: (_prev, next) => next,
@@ -41,6 +45,7 @@ export interface GraphOptions {
   chatModel: BaseChatModel;
   modelName: string;
   concurrency: number;
+  verbose?: boolean;
   maxPackages?: number;
   onProgress?: (stage: string, done: number, total: number) => void;
 }
@@ -49,17 +54,17 @@ export interface GraphOptions {
  * Build and compile the LangGraph supply chain analysis workflow.
  */
 export function buildAnalysisGraph(options: GraphOptions) {
-  const { chatModel, modelName, concurrency, maxPackages = 0, onProgress } = options;
+  const { chatModel, modelName, concurrency, verbose = false, maxPackages = 0, onProgress } = options;
 
   const graph = new StateGraph(AnalysisAnnotation)
     .addNode('fetch_metadata', async (state: AnalysisState) => {
-      const { metadata, sources } = await fetchMetadataNode(
+      const { metadata, sources, fetchErrors } = await fetchMetadataNode(
         state.dependencies,
         concurrency,
         maxPackages,
         (done, total) => onProgress?.('Fetching package metadata & source', done, total)
       );
-      return { metadata, sources };
+      return { metadata, sources, fetchErrors };
     })
     .addNode('primary_analysis', async (state: AnalysisState) => {
       const findings = await primaryAnalysisNode(
@@ -67,6 +72,7 @@ export function buildAnalysisGraph(options: GraphOptions) {
         state.sources,
         chatModel,
         concurrency,
+        verbose,
         (done, total) => onProgress?.('Investigating packages', done, total)
       );
       return { primaryFindings: findings };
@@ -87,6 +93,7 @@ export function buildAnalysisGraph(options: GraphOptions) {
       const result = aggregateNode(
         state.allFindings,
         state.metadata.size,
+        state.fetchErrors,
         modelName
       );
       return { result };

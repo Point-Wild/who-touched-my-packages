@@ -1,8 +1,19 @@
 import type { Dependency } from '../../scanner/types.js';
-import type { PackageMetadata, PackageSource } from '../types.js';
+import type { PackageFetchError, PackageMetadata, PackageSource } from '../types.js';
+import { fetchCratesMetadata, fetchCratesSource } from '../registry/crates.js';
+import { fetchGoMetadata, fetchGoSource } from '../registry/golang.js';
 import { fetchNpmMetadata, fetchNpmSource } from '../registry/npm.js';
 import { fetchPypiMetadata, fetchPypiSource } from '../registry/pypi.js';
-import { pMap, depKey } from '../utils.js';
+import { fetchRubyMetadata, fetchRubySource } from '../registry/ruby.js';
+import { describeFetchError, pMap, depKey } from '../utils.js';
+
+type SupplyChainDependency = Dependency & {
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+};
+
+function isSupplyChainDependency(dep: Dependency): dep is SupplyChainDependency {
+  return dep.ecosystem === 'npm' || dep.ecosystem === 'pypi' || dep.ecosystem === 'cargo' || dep.ecosystem === 'go' || dep.ecosystem === 'ruby';
+}
 
 /**
  * Fetch registry metadata and download source tarballs for all dependencies.
@@ -22,9 +33,11 @@ export async function fetchMetadataNode(
 ): Promise<{
   metadata: Map<string, PackageMetadata>;
   sources: Map<string, PackageSource>;
+  fetchErrors: PackageFetchError[];
 }> {
   const metadata = new Map<string, PackageMetadata>();
   const sources = new Map<string, PackageSource>();
+  const fetchErrors: PackageFetchError[] = [];
 
   // Deduplicate by name+ecosystem (same package may appear in multiple lockfiles)
   const unique = new Map<string, Dependency>();
@@ -33,7 +46,7 @@ export async function fetchMetadataNode(
     if (!unique.has(key)) unique.set(key, dep);
   }
 
-  let deps = Array.from(unique.values());
+  let deps = Array.from(unique.values()).filter(isSupplyChainDependency);
 
   // Apply package cap if requested
   if (maxPackages > 0 && deps.length > maxPackages) {
@@ -48,24 +61,73 @@ export async function fetchMetadataNode(
       const key = depKey(dep.ecosystem, dep.name);
 
       try {
-        // Fetch metadata first so we can pass the previous-version hint to the
-        // source fetcher (needed for version-diff computation in npm).
         const meta = dep.ecosystem === 'npm'
           ? await fetchNpmMetadata(dep.name)
-          : await fetchPypiMetadata(dep.name);
+          : dep.ecosystem === 'pypi'
+            ? await fetchPypiMetadata(dep.name)
+            : dep.ecosystem === 'cargo'
+              ? await fetchCratesMetadata(dep.name)
+              : dep.ecosystem === 'go'
+                ? await fetchGoMetadata(dep.name)
+                : await fetchRubyMetadata(dep.name);
 
         if (meta) {
           metadata.set(key, meta);
-
-          // For npm, pass the previous version so fetchNpmSource can diff tarballs.
-          const source = dep.ecosystem === 'npm'
-            ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
-            : await fetchPypiSource(dep.name, dep.version);
-
-          if (source) sources.set(key, source);
         }
-      } catch {
-        // Skip packages that fail to fetch — don't block the scan
+      } catch (error) {
+        const { message, statusCode } = describeFetchError(error);
+        fetchErrors.push({
+          packageName: dep.name,
+          packageVersion: dep.version,
+          ecosystem: dep.ecosystem,
+          stage: 'metadata',
+          message,
+          statusCode,
+        });
+        done++;
+        onProgress?.(done, deps.length);
+        return;
+      }
+
+      try {
+        const meta = metadata.get(key);
+        if (!meta) {
+          done++;
+          onProgress?.(done, deps.length);
+          return;
+        }
+
+        const source = dep.ecosystem === 'npm'
+          ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
+          : dep.ecosystem === 'pypi'
+            ? await fetchPypiSource(dep.name, dep.version)
+            : dep.ecosystem === 'cargo'
+              ? await fetchCratesSource(dep.name, dep.version)
+              : dep.ecosystem === 'go'
+                ? await fetchGoSource(dep.name, dep.version)
+                : await fetchRubySource(dep.name, dep.version);
+
+        if (source) {
+          sources.set(key, source);
+        } else {
+          fetchErrors.push({
+            packageName: dep.name,
+            packageVersion: dep.version,
+            ecosystem: dep.ecosystem,
+            stage: 'source',
+            message: `No source archive available for ${dep.name}@${dep.version}`,
+          });
+        }
+      } catch (error) {
+        const { message, statusCode } = describeFetchError(error);
+        fetchErrors.push({
+          packageName: dep.name,
+          packageVersion: dep.version,
+          ecosystem: dep.ecosystem,
+          stage: 'source',
+          message,
+          statusCode,
+        });
       }
 
       done++;
@@ -74,5 +136,5 @@ export async function fetchMetadataNode(
     concurrency
   );
 
-  return { metadata, sources };
+  return { metadata, sources, fetchErrors };
 }
