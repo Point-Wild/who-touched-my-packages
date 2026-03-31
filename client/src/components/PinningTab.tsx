@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
-import type { ReportData, Dependency } from '../types';
+import type { FinalReport, Dependency } from '../types';
 
 interface PinningTabProps {
-  data: ReportData;
+  data: FinalReport;
 }
 
 interface FileData {
@@ -15,6 +15,7 @@ interface FileData {
 }
 
 export function PinningTab({ data }: PinningTabProps) {
+  const reportData = data.reportData;
   const [selectedFile, setSelectedFile] = useState<FileData | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -22,7 +23,7 @@ export function PinningTab({ data }: PinningTabProps) {
   const fileGroups = useMemo(() => {
     const groups = new Map<string, Dependency[]>();
 
-    data.dependencies.forEach(dep => {
+    reportData.dependencies.forEach(dep => {
       const spec = dep.versionSpec;
       let isNonPinned = false;
 
@@ -41,7 +42,7 @@ export function PinningTab({ data }: PinningTabProps) {
     });
 
     return groups;
-  }, [data.dependencies]);
+  }, [reportData.dependencies]);
 
   useEffect(() => {
     if (fileGroups.size > 0 && !selectedFile) {

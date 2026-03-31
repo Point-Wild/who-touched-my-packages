@@ -15,6 +15,8 @@ import { findDependencyFiles } from './scanner/file-finder.js';
 import { detectLanguages } from './scanner/language-detector.js';
 import type { Dependency, DependencyEdge, UnresolvedDependency } from './scanner/types.js';
 import { analyzeSupplyChain, DEFAULT_CONCURRENCY, DEFAULT_MODEL, type SupplyChainReport } from './supply-chain/index.js';
+import { buildFinalReport, displayAggregatedReport } from './ui/aggregated-report.js';
+import type { ReportData } from './ui/html-report/types.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -22,6 +24,32 @@ import { cloneRepository } from './utils/git-clone.js';
 import { Logger } from './utils/logger.js';
 
 const program = new Command();
+
+interface CLIOptions {
+  path: string;
+  repo?: string;
+  branch?: string;
+  exclude: string[];
+  severity?: string;
+  failOn?: string;
+  json: boolean;
+  output?: string;
+  html: boolean;
+  open: boolean;
+  verbose: boolean;
+  quiet: boolean;
+  color: boolean;
+  timeout: string;
+  gitCloneDepth: string;
+  maxDepth: string;
+  supplyChain: boolean;
+  supplyChainModel?: string;
+  llmProvider?: 'anthropic' | 'openai' | 'gemini' | 'openrouter';
+  supplyChainConcurrency: string;
+  packageDepth: string;
+  supplyChainMaxPackages: string;
+  supplyChainDryRun: boolean;
+}
 
 program
   .name('who-touched-my-packages')
@@ -48,12 +76,12 @@ program
   .option('--supply-chain-model <model>', `LLM model for supply chain analysis (default: per-provider, e.g. ${DEFAULT_MODEL})`)
   .option('--llm-provider <provider>', 'LLM provider — auto-detected from model name when omitted (anthropic, openai, gemini, openrouter)')
   .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', String(DEFAULT_CONCURRENCY))
-  .option('--supply-chain-depth <number>', 'Transitive dependency depth to analyse (1 = direct only)', '1')
+  .option('--package-depth <number>', 'Maximum dependency package depth to include in graph/supply-chain input (1 = direct only)', '1')
   .option('--supply-chain-max-packages <number>', 'Maximum packages to analyse in supply chain scan (0 = unlimited)', '0')
   .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
   .parse();
 
-const options = program.opts();
+const options = program.opts() as CLIOptions;
 
 // Handle --no-color option early (before any output)
 if (options.color === false) {
@@ -120,34 +148,6 @@ async function main() {
     console.log(theme.dim('  ⚠️  This program is a work in progress. Accuracy is not guaranteed.\n'));
   }
   
-  let spinner: ReturnType<typeof ora> | null = null;
-  
-  if (!options.json && !options.quiet) {
-    spinner = ora({
-      text: 'Scanning for dependency files...',
-      color: 'cyan',
-    }).start();
-  }
-  
-  const files = await findDependencyFiles(scanPath, options.exclude, parseInt(options.maxDepth, 10) || 0);
-  
-  if (spinner) {
-    spinner.text = 'Parsing dependencies...';
-  }
-  
-  if (files.length === 0) {
-    if (!options.json && !options.quiet) {
-      clack.outro(theme.dim('No dependency files found.'));
-    }
-    process.exit(0);
-  }
-  
-  const dependencies = await parseDependencies(files);
-  
-  if (spinner) {
-    spinner.text = 'Checking for vulnerabilities...';
-  }
-  
   const reporter = new Reporter({
     json: options.json,
     severityFilter: options.severity,
@@ -156,194 +156,28 @@ async function main() {
     supplyChain: options.supplyChain,
     output: options.output,
   });
-  
-  // Build dependency trees for graph visualization and/or transitive supply chain scanning
-  let allDependencies: Dependency[] = dependencies;
-  let dependencyEdges: DependencyEdge[] = [];
-  let unresolvedDependencies: UnresolvedDependency[] = [];
-
-  const supplyChainDepth = parseInt(options.supplyChainDepth ?? '1', 10);
-  const needsTree = options.html || (options.supplyChain && supplyChainDepth > 1);
-
-  if (needsTree) {
-    if (spinner) {
-      spinner.text = 'Building dependency trees...';
-    }
-
-    const npmFiles = files.filter(f => f.type === 'package.json');
-    const pythonFiles = files.filter(f => f.type === 'requirements.txt');
-    const rustFiles = files.filter(f => f.type === 'Cargo.toml');
-    const goFiles = files.filter(f => f.type === 'go.mod');
-    const rubyFiles = files.filter(f => f.type === 'Gemfile.lock');
-    const allTreeNodes = new Map<string, Dependency>();
-
-    for (const file of npmFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'npm');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    // Include Python dependencies in the graph (flat list, no deep tree resolution yet)
-    for (const file of pythonFiles) {
-      const pythonDeps = dependencies.filter(d => d.file === file.path && d.ecosystem === 'pypi');
-      for (const dep of pythonDeps) {
-        const key = `${dep.name}@${dep.version}`;
-        if (!allTreeNodes.has(key)) {
-          allTreeNodes.set(key, dep);
-        }
-      }
-    }
-
-    // Include Rust/Cargo dependencies in the graph
-    for (const file of rustFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'cargo');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    // Include Go dependencies in the graph
-    for (const file of goFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'go');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    // Include Ruby dependencies in the graph
-    for (const file of rubyFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'ruby');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    allDependencies = Array.from(allTreeNodes.values());
-
-    // When supply chain scanning at depth > 1, filter to the requested depth
-    if (options.supplyChain && supplyChainDepth > 1) {
-      allDependencies = allDependencies.filter(d => (d.depth ?? 0) < supplyChainDepth);
-    }
+  let spinner: ReturnType<typeof ora> | null = null;
+  if (!options.json && !options.quiet) {
+    spinner = ora({
+      text: 'Scanning for dependency files...',
+      color: 'cyan',
+    }).start();
   }
-
-  // Verify package provenance (after tree building so allDependencies gets the data)
-  if (spinner) {
-    spinner.text = 'Verifying package provenance...';
-  }
-
-  try {
-    const verificationResults = await verifyPackages(allDependencies);
-    applyVerificationResults(allDependencies, verificationResults);
-    // Also apply to the original dependencies list for terminal output
-    if (allDependencies !== dependencies) {
-      applyVerificationResults(dependencies, verificationResults);
-    }
-  } catch (error) {
-    // Continue without provenance data if verification fails
-    if (options.verbose) {
-      console.log(theme.dim('Warning: Package provenance verification failed'));
-    }
-  }
-  
-  if (dependencies.length === 0) {
-    if (!options.json && !options.html && !options.quiet) {
-      clack.outro(theme.dim('No dependencies found.'));
-    }
-    process.exit(0);
-  }
-  
-  const dataSources = [
-    new OSVDataSource(),
-  ];
-  
-  const checker = new VulnerabilityChecker(dataSources);
-  const result = await checker.checkDependencies(dependencies);
+  const reportData = await scanWorkflow(scanPath, options, spinner);
+  let finalReport = buildFinalReport(reportData);
   
   // Run supply chain analysis if enabled
   let supplyChainReport: SupplyChainReport | undefined;
   if (options.supplyChain) {
     const blockingVulnerablePackages = new Set(
-      result.vulnerabilities
+      reportData.auditResult.vulnerabilities
         .filter(v => v.severity !== 'LOW')
         .map(v => `${v.ecosystem}:${v.packageName}@${v.packageVersion}`)
     );
-    const skippedSupplyChainDependencies = allDependencies.filter(
+    const skippedSupplyChainDependencies = reportData.dependencies.filter(
       dep => blockingVulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
     );
-    const supplyChainDependencies = allDependencies.filter(
+    const supplyChainDependencies = reportData.dependencies.filter(
       dep => !blockingVulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
     );
 
@@ -364,12 +198,11 @@ async function main() {
       }
 
       try {
-        supplyChainReport = await analyzeSupplyChain(allDependencies, {
+        supplyChainReport = await analyzeSupplyChain(reportData.dependencies, {
           model: options.supplyChainModel,
           provider: options.llmProvider,
           concurrency: parseInt(options.supplyChainConcurrency, 10),
           verbose: options.verbose,
-          depth: supplyChainDepth,
           maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
           dryRun: options.supplyChainDryRun,
         }, (stage, done, total) => {
@@ -407,6 +240,10 @@ async function main() {
   if (spinner) {
     spinner.succeed('Scan complete');
   }
+  finalReport = buildFinalReport(reportData, supplyChainReport);
+  if (!options.json && !options.quiet) {
+    displayAggregatedReport(finalReport);
+  }
   
   if (options.html) {
     if (!options.json && !options.quiet) {
@@ -416,8 +253,7 @@ async function main() {
       }).start();
     }
     
-    const languageStats = await detectLanguages(scanPath, options.exclude);
-    const server = await reporter.generateHtmlReport(result, allDependencies, scanPath, options.repo, languageStats, dependencyEdges, supplyChainReport, unresolvedDependencies);
+    const server = await reporter.generateHtmlReport(finalReport);
     
     if (spinner) {
       spinner.succeed('HTML report generated');
@@ -458,14 +294,14 @@ async function main() {
     // Don't exit - keep server running
     return;
   } else {
-    reporter.reportResults(result, files, dependencies, supplyChainReport, options.repo);
+    reporter.reportResults(finalReport, options.repo);
   }
   
   if (cleanup) {
     await cleanup();
   }
   
-  if (options.failOn && shouldFailOnSeverity(result.summary, options.failOn)) {
+  if (options.failOn && shouldFailOnSeverity(reportData.auditResult.summary, options.failOn)) {
     process.exit(1);
   }
   
@@ -475,6 +311,211 @@ async function main() {
   }
   
   process.exit(0);
+}
+
+async function scanWorkflow(
+  scanPath: string,
+  scanOptions: CLIOptions,
+  spinner: ReturnType<typeof ora> | null
+): Promise<ReportData> {
+  const packageDepth = parseInt(scanOptions.packageDepth ?? '1', 10);
+  const files = await findDependencyFiles(scanPath, scanOptions.exclude, parseInt(scanOptions.maxDepth, 10) || 0);
+
+  if (spinner) {
+    spinner.text = 'Parsing dependencies...';
+  }
+
+  if (files.length === 0) {
+    if (!scanOptions.json && !scanOptions.quiet) {
+      clack.outro(theme.dim('No dependency files found.'));
+    }
+    process.exit(0);
+  }
+
+  const scannedDependencies = await parseDependencies(files);
+
+  if (spinner) {
+    spinner.text = 'Checking for vulnerabilities...';
+  }
+
+  let allDependencies: Dependency[] = scannedDependencies;
+  let dependencyEdges: DependencyEdge[] = [];
+  let unresolvedDependencies: UnresolvedDependency[] = [];
+
+  const needsTree = scanOptions.html || (scanOptions.supplyChain && packageDepth > 1);
+
+  if (needsTree) {
+    if (spinner) {
+      spinner.text = 'Building dependency trees...';
+    }
+
+    const npmFiles = files.filter(f => f.type === 'package.json');
+    const pythonFiles = files.filter(f => f.type === 'requirements.txt');
+    const rustFiles = files.filter(f => f.type === 'Cargo.toml');
+    const goFiles = files.filter(f => f.type === 'go.mod');
+    const rubyFiles = files.filter(f => f.type === 'Gemfile.lock');
+    const allTreeNodes = new Map<string, Dependency>();
+
+    for (const file of npmFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'npm');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+
+    for (const file of pythonFiles) {
+      const pythonDeps = scannedDependencies.filter(d => d.file === file.path && d.ecosystem === 'pypi');
+      for (const dep of pythonDeps) {
+        const key = `${dep.name}@${dep.version}`;
+        if (!allTreeNodes.has(key)) {
+          allTreeNodes.set(key, dep);
+        }
+      }
+    }
+
+    for (const file of rustFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'cargo');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+
+    for (const file of goFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'go');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+
+    for (const file of rubyFiles) {
+      try {
+        const tree = await buildDependencyTree(file.path, 'ruby');
+        const flatDeps = flattenDependencyTree(tree);
+
+        flatDeps.forEach(dep => {
+          const key = `${dep.name}@${dep.version}`;
+          if (!allTreeNodes.has(key)) {
+            allTreeNodes.set(key, dep);
+          } else {
+            const existing = allTreeNodes.get(key)!;
+            if (dep.paths) {
+              existing.paths = existing.paths || [];
+              existing.paths.push(...dep.paths);
+            }
+          }
+        });
+
+        dependencyEdges.push(...tree.edges);
+        unresolvedDependencies.push(...tree.unresolved);
+      } catch (error) {
+        // Skip files that fail to parse
+      }
+    }
+
+    allDependencies = Array.from(allTreeNodes.values());
+
+    if (scanOptions.supplyChain && packageDepth > 1) {
+      allDependencies = allDependencies.filter(d => (d.depth ?? 0) < packageDepth);
+    }
+  }
+
+  if (spinner) {
+    spinner.text = 'Verifying package provenance...';
+  }
+
+  try {
+    const verificationResults = await verifyPackages(allDependencies);
+    applyVerificationResults(allDependencies, verificationResults);
+    if (allDependencies !== scannedDependencies) {
+      applyVerificationResults(scannedDependencies, verificationResults);
+    }
+  } catch (error) {
+    if (scanOptions.verbose) {
+      console.log(theme.dim('Warning: Package provenance verification failed'));
+    }
+  }
+
+  if (scannedDependencies.length === 0) {
+    if (!scanOptions.json && !scanOptions.html && !scanOptions.quiet) {
+      clack.outro(theme.dim('No dependencies found.'));
+    }
+    process.exit(0);
+  }
+
+  const checker = new VulnerabilityChecker([
+    new OSVDataSource(),
+  ]);
+
+  const auditResult = await checker.checkDependencies(scannedDependencies);
+  const languageStats = scanOptions.html
+    ? await detectLanguages(scanPath, scanOptions.exclude)
+    : undefined;
+
+  return {
+    auditResult,
+    dependencies: allDependencies,
+    scannedDependencies,
+    files,
+    scanPath,
+    repositoryUrl: scanOptions.repo,
+    languageStats,
+    dependencyEdges,
+    unresolvedDependencies,
+  };
 }
 
 main().catch(async (error) => {

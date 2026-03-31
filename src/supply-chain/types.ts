@@ -88,8 +88,6 @@ export interface SupplyChainOptions {
   provider?: LLMProvider;
   concurrency?: number;
   verbose?: boolean;
-  /** Transitive dependency depth to analyze. 1 = direct deps only (default). */
-  depth?: number;
   /** Hard cap on number of packages analyzed. 0 = unlimited (default). */
   maxPackages?: number;
   dryRun?: boolean;

@@ -1,7 +1,7 @@
-import type { ReportData, UnresolvedDependency } from '../types';
+import type { FinalReport, UnresolvedDependency } from '../types';
 
 interface UnresolvedDependenciesTabProps {
-  data: ReportData;
+  data: FinalReport;
 }
 
 const reasonDescriptions: Record<UnresolvedDependency['reason'], string> = {
@@ -21,7 +21,7 @@ const reasonFootnotes = [
 ];
 
 export function UnresolvedDependenciesTab({ data }: UnresolvedDependenciesTabProps) {
-  const unresolved = data.unresolvedDependencies || [];
+  const unresolved = data.reportData.unresolvedDependencies || [];
 
   if (unresolved.length === 0) {
     return (

@@ -1,23 +1,24 @@
 import { useMemo, useState } from 'react';
-import type { ReportData } from '../types';
+import type { FinalReport } from '../types';
 import { ExportButton } from './ExportButton';
 
 interface VulnerabilitiesTabProps {
-  data: ReportData;
+  data: FinalReport;
 }
 
 export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
+  const reportData = data.reportData;
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
 
   const vulnerabilitiesWithPaths = useMemo(() => {
-    return data.auditResult.vulnerabilities.map(vuln => {
-      const filePaths = data.dependencies
+    return reportData.auditResult.vulnerabilities.map(vuln => {
+      const filePaths = reportData.dependencies
         .filter(dep => dep.name === vuln.packageName)
         .map(dep => dep.file);
       return { ...vuln, filePaths: [...new Set(filePaths)] };
     });
-  }, [data]);
+  }, [reportData]);
 
   const filteredVulns = useMemo(() => {
     return vulnerabilitiesWithPaths.filter(vuln => {
@@ -44,7 +45,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
     { key: 'references' as const, label: 'References' },
   ];
 
-  if (data.auditResult.vulnerabilities.length === 0) {
+  if (reportData.auditResult.vulnerabilities.length === 0) {
     return (
       <div className="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

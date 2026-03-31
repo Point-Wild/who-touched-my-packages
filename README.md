@@ -283,6 +283,12 @@ npm run test:all:llm -- --llm-provider openrouter --supply-chain-model anthropic
 npm run test:all:llm --llm-provider openrouter --supply-chain-model anthropic/claude-sonnet-4-5
 ```
 
+For the CLI scanner itself, use `--package-depth` to control how many dependency levels are included in graph building and supply-chain input:
+
+```bash
+wtmp --supply-chain --package-depth 2
+```
+
 ### Run individual CVE/advisory checks
 
 These test `checker.checkDependencies(...)` directly against OSV-backed vulnerable package versions.

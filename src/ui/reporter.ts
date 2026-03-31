@@ -1,8 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import type { AuditResult, Vulnerability } from '../auditor/types.js';
+import type { FinalReport } from './aggregated-report.js';
 import type { Dependency, DependencyEdge, DependencyFile } from '../scanner/types.js';
 import { formatFileList, formatProvenanceSummary, formatSummary, formatVulnerability } from './formatters.js';
-import type { ReportData } from './html-report/types.js';
 import { createHyperlink, theme } from './theme.js';
 
 export interface ReporterOptions {
@@ -30,19 +30,20 @@ export class Reporter {
   }
   
   reportResults(
-    result: AuditResult,
-    files?: DependencyFile[],
-    dependencies?: Dependency[],
-    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport,
+    finalReport: FinalReport,
     repositoryUrl?: string
   ): void {
-
     if (this.options.json) {
-      this.reportJson(result);
+      this.reportJson(finalReport);
       return;
     }
     
-    this.reportTerminal(result, files, dependencies, repositoryUrl);
+    this.reportTerminal(
+      finalReport.reportData.auditResult,
+      finalReport.reportData.files,
+      finalReport.reportData.scannedDependencies,
+      repositoryUrl ?? finalReport.reportData.repositoryUrl
+    );
   }
   
   private reportTerminal(result: AuditResult, files?: DependencyFile[], dependencies?: Dependency[], repositoryUrl?: string): void {
@@ -153,13 +154,11 @@ export class Reporter {
     console.log(theme.dim("Powered By: ") + createHyperlink('https://ThreatPoint.com', 'https://ThreatPoint.com', '#3D7FF3') + '\n');
   }
   
-  private reportJson(result: AuditResult): void {
-    const filtered = this.filterBySeverity(result.vulnerabilities);
+  private reportJson(finalReport: FinalReport): void {
+    const filtered = this.filterBySeverity(finalReport.reportData.auditResult.vulnerabilities);
     
     const output = {
-      summary: result.summary,
-      scannedPackages: result.scannedPackages,
-      timestamp: result.timestamp.toISOString(),
+      ...finalReport,
       vulnerabilities: filtered.map(v => ({
         id: v.id,
         packageName: v.packageName,
@@ -230,27 +229,18 @@ export class Reporter {
   }
   
   async generateHtmlReport(
-    result: AuditResult,
-    dependencies: Dependency[],
-    scanPath: string,
-    repositoryUrl?: string,
-    languageStats?: import('./html-report/types.js').LanguageStats[],
-    dependencyEdges?: DependencyEdge[],
-    supplyChainReport?: import('../supply-chain/types.js').SupplyChainReport,
+    finalReport: FinalReport,
     unresolvedDependencies?: import('../scanner/types.js').UnresolvedDependency[]
   ): Promise<{ url: string; close: () => void }> {
-
-    const reportData: ReportData = {
-      auditResult: result,
-      dependencies,
-      scanPath,
-      repositoryUrl,
-      languageStats,
-      dependencyEdges,
-      unresolvedDependencies,
+    const fullReportData: FinalReport = {
+      ...finalReport,
+      reportData: {
+        ...finalReport.reportData,
+        unresolvedDependencies: unresolvedDependencies ?? finalReport.reportData.unresolvedDependencies,
+      },
     };
     
     const { generateAndServeReport } = await import('./html-report/new-generator.js');
-    return await generateAndServeReport(reportData);
+    return await generateAndServeReport(fullReportData);
   }
 }

@@ -1,17 +1,18 @@
 import { useMemo } from 'react';
-import type { ReportData } from '../types';
+import type { FinalReport } from '../types';
 import Donut from './donut/Donut';
 
 interface OverviewTabProps {
-  data: ReportData;
+  data: FinalReport;
   onNavigateToPinning: () => void;
 }
 
 export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
-  const { summary } = data.auditResult;
+  const reportData = data.reportData;
+  const { summary } = reportData.auditResult;
 
   const nonPinnedDeps = useMemo(() => {
-    return data.dependencies.filter(dep => {
+    return reportData.dependencies.filter(dep => {
       const spec = dep.versionSpec;
       if (dep.ecosystem === 'npm') {
         return spec.startsWith('^') || spec.startsWith('~') || spec.includes('*') || spec.includes('x') || spec.includes('X') || spec === 'latest';
@@ -21,14 +22,14 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
       }
       return false;
     });
-  }, [data.dependencies]);
+  }, [reportData.dependencies]);
 
   const vulnerablePackages = useMemo(() => {
-    return new Set(data.auditResult.vulnerabilities.map(v => v.packageName));
-  }, [data]);
+    return new Set(reportData.auditResult.vulnerabilities.map(v => v.packageName));
+  }, [reportData]);
 
-  const vulnerableDependencies = data.dependencies.filter(dep => vulnerablePackages.has(dep.name)).length;
-  const nonVulnerableDependencies = data.dependencies.length - vulnerableDependencies;
+  const vulnerableDependencies = reportData.dependencies.filter(dep => vulnerablePackages.has(dep.name)).length;
+  const nonVulnerableDependencies = reportData.dependencies.length - vulnerableDependencies;
   return (
     <>
       <div className="stats-grid">
@@ -54,7 +55,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
         </div>
         <div className="stat-card paper">
           <div className="label">Scanned Packages</div>
-          <div className="value">{data.auditResult.scannedPackages}</div>
+          <div className="value">{reportData.auditResult.scannedPackages}</div>
         </div>
       </div>
 
@@ -106,7 +107,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
                   '#a82424',
                   '#10b981'
                 ]}
-                total={data.dependencies.length}
+                total={reportData.dependencies.length}
                 totalLabel="Total Packages"
             />
           </div>
@@ -114,7 +115,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
             <h3 style={{ marginBottom: '1rem' }}>Languages Detected</h3>
             <Donut
                 data={
-                  data.languageStats?.map((lang) => {
+                  reportData.languageStats?.map((lang) => {
                     return {
                       label: `${lang.language}`,
                       count: lang.fileCount,
@@ -129,7 +130,7 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
                 '#f59e0b',
                 '#f43f5e',
               ]}
-              total={data.languageStats?.reduce((sum, lang) => sum + lang.fileCount, 0) ?? 0}
+              total={reportData.languageStats?.reduce((sum, lang) => sum + lang.fileCount, 0) ?? 0}
               totalLabel="Total Files"
             />
           </div>

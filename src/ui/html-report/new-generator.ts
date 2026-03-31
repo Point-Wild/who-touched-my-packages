@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStaticServer } from './server.js';
-import type { ReportData } from './types.js';
+import type { FinalReport } from '../aggregated-report.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export async function generateAndServeReport(data: ReportData): Promise<{ url: string; close: () => void }> {
+export async function generateAndServeReport(data: FinalReport): Promise<{ url: string; close: () => void }> {
   const reportDir = join(tmpdir(), 'who-touched-my-packages-reports');
   mkdirSync(reportDir, { recursive: true });
 
@@ -28,7 +28,7 @@ export async function generateAndServeReport(data: ReportData): Promise<{ url: s
 
   // Collect all file paths that should be accessible
   const filePaths = new Set<string>();
-  data.dependencies.forEach(dep => {
+  data.reportData.dependencies.forEach(dep => {
     filePaths.add(dep.file);
   });
 
