@@ -35,14 +35,14 @@ export async function fetchCratesMetadata(packageName: string): Promise<PackageM
     newMaintainers: [],
     packageAgeDays,
     publishedDaysAgo,
-    typosquatCandidate: computeTyposquatCandidate(packageName, 'cratesio'),
+    typosquatCandidate: computeTyposquatCandidate(packageName, 'cargo'),
     isDependencyConfusion: isDependencyConfusion(packageName),
     hasProvenance: false,
   };
 
   return {
     name: packageName,
-    ecosystem: 'cratesio',
+    ecosystem: 'cargo',
     latestVersion: crate.newest_version ?? '',
     previousVersion,
     createdAt,
@@ -98,7 +98,7 @@ export async function fetchCratesSource(
 
   return {
     name: packageName,
-    ecosystem: 'cratesio',
+    ecosystem: 'cargo',
     version,
     entryPoint: entryKey ? fileContents[entryKey] : undefined,
     installScripts,

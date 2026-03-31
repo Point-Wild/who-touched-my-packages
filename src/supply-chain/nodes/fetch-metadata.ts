@@ -6,6 +6,14 @@ import { fetchNpmMetadata, fetchNpmSource } from '../registry/npm.js';
 import { fetchPypiMetadata, fetchPypiSource } from '../registry/pypi.js';
 import { describeFetchError, pMap, depKey } from '../utils.js';
 
+type SupplyChainDependency = Dependency & {
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go';
+};
+
+function isSupplyChainDependency(dep: Dependency): dep is SupplyChainDependency {
+  return dep.ecosystem === 'npm' || dep.ecosystem === 'pypi' || dep.ecosystem === 'cargo' || dep.ecosystem === 'go';
+}
+
 /**
  * Fetch registry metadata and download source tarballs for all dependencies.
  *
@@ -37,7 +45,7 @@ export async function fetchMetadataNode(
     if (!unique.has(key)) unique.set(key, dep);
   }
 
-  let deps = Array.from(unique.values());
+  let deps = Array.from(unique.values()).filter(isSupplyChainDependency);
 
   // Apply package cap if requested
   if (maxPackages > 0 && deps.length > maxPackages) {
@@ -56,7 +64,7 @@ export async function fetchMetadataNode(
           ? await fetchNpmMetadata(dep.name)
           : dep.ecosystem === 'pypi'
             ? await fetchPypiMetadata(dep.name)
-            : dep.ecosystem === 'cratesio'
+            : dep.ecosystem === 'cargo'
               ? await fetchCratesMetadata(dep.name)
               : await fetchGoMetadata(dep.name);
 
@@ -90,7 +98,7 @@ export async function fetchMetadataNode(
           ? await fetchNpmSource(dep.name, dep.version, meta.previousVersion)
           : dep.ecosystem === 'pypi'
             ? await fetchPypiSource(dep.name, dep.version)
-            : dep.ecosystem === 'cratesio'
+            : dep.ecosystem === 'cargo'
               ? await fetchCratesSource(dep.name, dep.version)
               : await fetchGoSource(dep.name, dep.version);
 

@@ -48,14 +48,14 @@ export async function fetchGoMetadata(packageName: string): Promise<PackageMetad
     newMaintainers: [],
     packageAgeDays,
     publishedDaysAgo,
-    typosquatCandidate: computeTyposquatCandidate(packageName, 'golang'),
+    typosquatCandidate: computeTyposquatCandidate(packageName, 'go'),
     isDependencyConfusion: isDependencyConfusion(packageName),
     hasProvenance: false,
   };
 
   return {
     name: packageName,
-    ecosystem: 'golang',
+    ecosystem: 'go',
     latestVersion,
     previousVersion,
     createdAt,
@@ -105,7 +105,7 @@ export async function fetchGoSource(
 
   return {
     name: packageName,
-    ecosystem: 'golang',
+    ecosystem: 'go',
     version,
     entryPoint: entryKey ? fileContents[entryKey] : undefined,
     installScripts: {},

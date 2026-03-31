@@ -335,14 +335,16 @@ async function main() {
   // Run supply chain analysis if enabled
   let supplyChainReport: SupplyChainReport | undefined;
   if (options.supplyChain) {
-    const vulnerablePackages = new Set(
-      result.vulnerabilities.map(v => `${v.ecosystem}:${v.packageName}@${v.packageVersion}`)
+    const blockingVulnerablePackages = new Set(
+      result.vulnerabilities
+        .filter(v => v.severity !== 'LOW')
+        .map(v => `${v.ecosystem}:${v.packageName}@${v.packageVersion}`)
     );
     const skippedSupplyChainDependencies = allDependencies.filter(
-      dep => vulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
+      dep => blockingVulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
     );
     const supplyChainDependencies = allDependencies.filter(
-      dep => !vulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
+      dep => !blockingVulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
     );
 
     if (skippedSupplyChainDependencies.length > 0 && !options.json && !options.quiet) {

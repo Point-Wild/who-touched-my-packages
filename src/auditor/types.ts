@@ -4,7 +4,7 @@ export interface Vulnerability {
   id: string;
   packageName: string;
   packageVersion: string;
-  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang' | 'ruby';
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
   severity: Severity;
   title: string;
   description: string;

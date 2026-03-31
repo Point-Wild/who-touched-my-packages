@@ -14,7 +14,6 @@ import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-
 import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
 
 const PYPI_TEXT_PATTERN = /\.(py|js|ts|sh|json|yml|yaml|toml|cfg|ini|txt|md|pth|bat|ps1)$/i;
-const MAX_LLM_FILES = parseInt(process.env.SC_MAX_LLM_FILES ?? '5');
 
 // CDN URLs extracted from the OSV advisory
 const TARGETS = [
@@ -84,7 +83,7 @@ async function scanTarget(target: typeof TARGETS[0]) {
   const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(source);
 
   console.log('\n' + formatTriageResults(triageResults, allContent.size).split('\n').map(l => '  ' + l).join('\n'));
-  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation (SC_MAX_LLM_FILES=${MAX_LLM_FILES})\n`);
+  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation\n`);
   assert(
     filesToInvestigate.length > 0,
     `Expected suspicious files for ${target.label}, but triage selected none`
@@ -132,7 +131,7 @@ async function scanTarget(target: typeof TARGETS[0]) {
     );
   } else if (!apiKey) {
     console.log('  ℹ️  Set OPENROUTER_API_KEY to run LLM analysis on flagged files.');
-    console.log(`  ℹ️  ${filesToInvestigate.length} file(s) would be analyzed (SC_MAX_LLM_FILES=${MAX_LLM_FILES}).`);
+    console.log(`  ℹ️  ${filesToInvestigate.length} file(s) would be analyzed.`);
   }
 
   return {

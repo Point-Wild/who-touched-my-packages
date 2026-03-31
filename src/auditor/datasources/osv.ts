@@ -108,9 +108,9 @@ export class OSVDataSource extends DataSource {
         return 'npm';
       case 'pypi':
         return 'PyPI';
-      case 'cratesio':
+      case 'cargo':
         return 'crates.io';
-      case 'golang':
+      case 'go':
         return 'Go';
       case 'ruby':
         return 'RubyGems';

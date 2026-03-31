@@ -11,15 +11,13 @@ import { createChatModel } from './src/supply-chain/llm/client.js';
 import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-chain/nodes/primary-analysis.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
 
-const MAX_LLM_FILES = parseInt(process.env.SC_MAX_LLM_FILES ?? '5');
-
 const TARGETS = [
   {
     label: 'malicious Go init exfiltration module',
     version: 'v0.0.1-malicious-fixture',
     source: {
       name: 'github.com/example/telemetry-helper',
-      ecosystem: 'golang',
+      ecosystem: 'go',
       version: 'v0.0.1-malicious-fixture',
       installScripts: {},
       fileList: [
@@ -70,7 +68,7 @@ function buildFakeMetadata(version: string): PackageMetadata {
 
   return {
     name: 'github.com/example/telemetry-helper',
-    ecosystem: 'golang',
+    ecosystem: 'go',
     latestVersion: version,
     previousVersion: 'v0.0.0',
     createdAt: '2026-03-01T00:00:00Z',
@@ -93,7 +91,7 @@ async function scanTarget(target: typeof TARGETS[0]) {
   const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(target.source);
 
   console.log('\n' + formatTriageResults(triageResults, allContent.size).split('\n').map(l => '  ' + l).join('\n'));
-  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation (SC_MAX_LLM_FILES=${MAX_LLM_FILES})\n`);
+  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation \n`);
 
   assert(
     filesToInvestigate.length > 0,
@@ -134,7 +132,7 @@ async function scanTarget(target: typeof TARGETS[0]) {
     );
   } else {
     console.log('  ℹ️  Set OPENROUTER_API_KEY to run LLM analysis on flagged files.');
-    console.log(`  ℹ️  ${filesToInvestigate.length} file(s) would be analyzed (SC_MAX_LLM_FILES=${MAX_LLM_FILES}).`);
+    console.log(`  ℹ️  ${filesToInvestigate.length} file(s) would be analyzed .`);
   }
 
   return {

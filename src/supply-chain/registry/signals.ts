@@ -89,7 +89,7 @@ function levenshtein(a: string, b: string): number {
  */
 export function computeTyposquatCandidate(
   name: string,
-  ecosystem: 'npm' | 'pypi' | 'cratesio' | 'golang'
+  ecosystem: 'npm' | 'pypi' | 'cargo' | 'go'
 ): string | null {
   const list = ecosystem === 'npm'
     ? TOP_NPM
