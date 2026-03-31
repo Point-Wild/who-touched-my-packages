@@ -9,14 +9,10 @@ import * as Package from "../package.json" assert { type: "json" };
 import { OSVDataSource } from './auditor/datasources/index.js';
 import { applyVerificationResults, verifyPackages } from './auditor/package-verifier.js';
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
-import { parseDependencies } from './scanner/dependency-parser.js';
-import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency-tree-resolver.js';
-import { findDependencyFiles } from './scanner/file-finder.js';
-import { detectLanguages } from './scanner/language-detector.js';
-import type { Dependency, DependencyEdge, UnresolvedDependency } from './scanner/types.js';
+import type { Dependency } from './scanner/types.js';
+import { scanWorkflow, type ScanWorkflowOptions } from './scan-workflow.js';
 import { analyzeSupplyChain, DEFAULT_CONCURRENCY, DEFAULT_MODEL, type SupplyChainReport } from './supply-chain/index.js';
 import { buildFinalReport, displayAggregatedReport } from './ui/aggregated-report.js';
-import type { ReportData } from './ui/html-report/types.js';
 import { Reporter } from './ui/reporter.js';
 import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
@@ -25,28 +21,19 @@ import { Logger } from './utils/logger.js';
 
 const program = new Command();
 
-interface CLIOptions {
+interface CLIOptions extends ScanWorkflowOptions {
   path: string;
-  repo?: string;
   branch?: string;
-  exclude: string[];
   severity?: string;
   failOn?: string;
-  json: boolean;
   output?: string;
-  html: boolean;
   open: boolean;
-  verbose: boolean;
-  quiet: boolean;
   color: boolean;
   timeout: string;
   gitCloneDepth: string;
-  maxDepth: string;
-  supplyChain: boolean;
   supplyChainModel?: string;
   llmProvider?: 'anthropic' | 'openai' | 'gemini' | 'openrouter';
   supplyChainConcurrency: string;
-  packageDepth: string;
   supplyChainMaxPackages: string;
   supplyChainDryRun: boolean;
 }
@@ -198,7 +185,7 @@ async function main() {
       }
 
       try {
-        supplyChainReport = await analyzeSupplyChain(reportData.dependencies, {
+        supplyChainReport = await analyzeSupplyChain(supplyChainDependencies, {
           model: options.supplyChainModel,
           provider: options.llmProvider,
           concurrency: parseInt(options.supplyChainConcurrency, 10),
@@ -311,211 +298,6 @@ async function main() {
   }
   
   process.exit(0);
-}
-
-async function scanWorkflow(
-  scanPath: string,
-  scanOptions: CLIOptions,
-  spinner: ReturnType<typeof ora> | null
-): Promise<ReportData> {
-  const packageDepth = parseInt(scanOptions.packageDepth ?? '1', 10);
-  const files = await findDependencyFiles(scanPath, scanOptions.exclude, parseInt(scanOptions.maxDepth, 10) || 0);
-
-  if (spinner) {
-    spinner.text = 'Parsing dependencies...';
-  }
-
-  if (files.length === 0) {
-    if (!scanOptions.json && !scanOptions.quiet) {
-      clack.outro(theme.dim('No dependency files found.'));
-    }
-    process.exit(0);
-  }
-
-  const scannedDependencies = await parseDependencies(files);
-
-  if (spinner) {
-    spinner.text = 'Checking for vulnerabilities...';
-  }
-
-  let allDependencies: Dependency[] = scannedDependencies;
-  let dependencyEdges: DependencyEdge[] = [];
-  let unresolvedDependencies: UnresolvedDependency[] = [];
-
-  const needsTree = scanOptions.html || (scanOptions.supplyChain && packageDepth > 1);
-
-  if (needsTree) {
-    if (spinner) {
-      spinner.text = 'Building dependency trees...';
-    }
-
-    const npmFiles = files.filter(f => f.type === 'package.json');
-    const pythonFiles = files.filter(f => f.type === 'requirements.txt');
-    const rustFiles = files.filter(f => f.type === 'Cargo.toml');
-    const goFiles = files.filter(f => f.type === 'go.mod');
-    const rubyFiles = files.filter(f => f.type === 'Gemfile.lock');
-    const allTreeNodes = new Map<string, Dependency>();
-
-    for (const file of npmFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'npm');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    for (const file of pythonFiles) {
-      const pythonDeps = scannedDependencies.filter(d => d.file === file.path && d.ecosystem === 'pypi');
-      for (const dep of pythonDeps) {
-        const key = `${dep.name}@${dep.version}`;
-        if (!allTreeNodes.has(key)) {
-          allTreeNodes.set(key, dep);
-        }
-      }
-    }
-
-    for (const file of rustFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'cargo');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    for (const file of goFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'go');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    for (const file of rubyFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'ruby');
-        const flatDeps = flattenDependencyTree(tree);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        // Skip files that fail to parse
-      }
-    }
-
-    allDependencies = Array.from(allTreeNodes.values());
-
-    if (scanOptions.supplyChain && packageDepth > 1) {
-      allDependencies = allDependencies.filter(d => (d.depth ?? 0) < packageDepth);
-    }
-  }
-
-  if (spinner) {
-    spinner.text = 'Verifying package provenance...';
-  }
-
-  try {
-    const verificationResults = await verifyPackages(allDependencies);
-    applyVerificationResults(allDependencies, verificationResults);
-    if (allDependencies !== scannedDependencies) {
-      applyVerificationResults(scannedDependencies, verificationResults);
-    }
-  } catch (error) {
-    if (scanOptions.verbose) {
-      console.log(theme.dim('Warning: Package provenance verification failed'));
-    }
-  }
-
-  if (scannedDependencies.length === 0) {
-    if (!scanOptions.json && !scanOptions.html && !scanOptions.quiet) {
-      clack.outro(theme.dim('No dependencies found.'));
-    }
-    process.exit(0);
-  }
-
-  const checker = new VulnerabilityChecker([
-    new OSVDataSource(),
-  ]);
-
-  const auditResult = await checker.checkDependencies(scannedDependencies);
-  const languageStats = scanOptions.html
-    ? await detectLanguages(scanPath, scanOptions.exclude)
-    : undefined;
-
-  return {
-    auditResult,
-    dependencies: allDependencies,
-    scannedDependencies,
-    files,
-    scanPath,
-    repositoryUrl: scanOptions.repo,
-    languageStats,
-    dependencyEdges,
-    unresolvedDependencies,
-  };
 }
 
 main().catch(async (error) => {
