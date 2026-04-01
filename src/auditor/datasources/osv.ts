@@ -157,7 +157,7 @@ export class OSVDataSource extends DataSource {
   
   private extractSeverity(vuln: OSVVulnerability): Vulnerability['severity'] {
     if (!vuln.severity || vuln.severity.length === 0) {
-      return 'UNKNOWN';
+      return this.inferSeverityWithoutCVSS(vuln);
     }
     
     for (const sev of vuln.severity) {
@@ -171,7 +171,55 @@ export class OSVDataSource extends DataSource {
       }
     }
     
-    return 'UNKNOWN';
+    return this.inferSeverityWithoutCVSS(vuln);
+  }
+
+  private inferSeverityWithoutCVSS(vuln: OSVVulnerability): Vulnerability['severity'] {
+    const id = vuln.id.toUpperCase();
+    const text = `${vuln.summary ?? ''}\n${vuln.details ?? ''}`.toLowerCase();
+
+    if (id.startsWith('MAL-')) {
+      return 'CRITICAL';
+    }
+
+    const criticalIndicators = [
+      'malicious code',
+      'malicious package',
+      'credential harvesting',
+      'credential harvester',
+      'exfiltrat',
+      'backdoor',
+      'steal',
+      'stealer',
+      'trojan',
+      'persistence mechanism',
+      'remote api',
+      'metadata server',
+      'cloud access token',
+      'automatically activated malware',
+      'supply chain attack',
+    ];
+
+    if (criticalIndicators.some(indicator => text.includes(indicator))) {
+      return 'CRITICAL';
+    }
+
+    const highIndicators = [
+      'remote code execution',
+      'arbitrary code execution',
+      'code execution',
+      'command execution',
+      'deserialization',
+      'sql injection',
+      'template injection',
+      'prototype pollution',
+    ];
+
+    if (highIndicators.some(indicator => text.includes(indicator))) {
+      return 'HIGH';
+    }
+
+    return 'LOW';
   }
   
   private extractCVSS(vuln: OSVVulnerability): number | undefined {

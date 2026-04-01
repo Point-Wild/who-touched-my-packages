@@ -31,6 +31,11 @@ export async function generateAndServeReport(data: FinalReport): Promise<{ url: 
   data.reportData.dependencies.forEach(dep => {
     filePaths.add(dep.file);
   });
+  data.supplyChainReport?.findings.forEach(finding => {
+    if (finding.filePath) {
+      filePaths.add(finding.filePath);
+    }
+  });
 
   // Start the server (will find available port automatically)
   const server = await startStaticServer({

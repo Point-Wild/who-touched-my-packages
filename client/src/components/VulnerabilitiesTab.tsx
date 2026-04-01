@@ -39,7 +39,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
       title: finding.title,
       references: [],
       source: 'LLM',
-      filePaths: [],
+      filePaths: finding.filePath ? [finding.filePath] : [],
     }));
 
     return [...staticFindings, ...supplyChainFindings];

@@ -30,6 +30,7 @@ export interface SupplyChainFinding {
   packageName: string;
   packageVersion: string;
   ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+  filePath: string;
   category: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   confidence: number;

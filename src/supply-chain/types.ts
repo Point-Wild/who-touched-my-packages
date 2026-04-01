@@ -46,6 +46,7 @@ export interface SupplyChainFinding {
   packageName: string;
   packageVersion: string;
   ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
+  filePath: string;
   category: ThreatCategory;
   severity: Severity;
   confidence: number;
