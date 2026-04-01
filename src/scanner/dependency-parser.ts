@@ -10,8 +10,20 @@ export async function parseDependencies(files: DependencyFile[]): Promise<Depend
       
       if (file.type === 'package.json') {
         dependencies.push(...parsePackageJson(content, file.path));
+      } else if (file.type === 'package-lock.json') {
+        dependencies.push(...parsePackageLockJson(content, file.path));
+      } else if (file.type === 'yarn.lock') {
+        dependencies.push(...parseYarnLock(content, file.path));
+      } else if (file.type === 'pnpm-lock.yaml') {
+        dependencies.push(...parsePnpmLock(content, file.path));
+      } else if (file.type === 'bun.lock') {
+        dependencies.push(...parseBunLock(content, file.path));
       } else if (file.type === 'requirements.txt') {
         dependencies.push(...parseRequirementsTxt(content, file.path));
+      } else if (file.type === 'poetry.lock') {
+        dependencies.push(...parsePoetryLock(content, file.path));
+      } else if (file.type === 'Pipfile.lock') {
+        dependencies.push(...parsePipfileLock(content, file.path));
       } else if (file.type === 'Cargo.toml') {
         dependencies.push(...parseCargoToml(content, file.path));
       } else if (file.type === 'Cargo.lock') {
@@ -22,6 +34,8 @@ export async function parseDependencies(files: DependencyFile[]): Promise<Depend
         dependencies.push(...parseGoSum(content, file.path));
       } else if (file.type === 'Gemfile.lock') {
         dependencies.push(...parseGemfileLock(content, file.path));
+      } else if (file.type === 'Gemfile') {
+        dependencies.push(...parseGemfile(content, file.path));
       }
     } catch (error) {
       // Skip files we can't read
@@ -64,6 +78,327 @@ function parsePackageJson(content: string, filePath: string): Dependency[] {
     }
   } catch (error) {
     // Invalid JSON, skip
+  }
+  
+  return dependencies;
+}
+
+function parsePackageLockJson(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const seen = new Set<string>();
+  
+  try {
+    const lockfile = JSON.parse(content);
+    
+    // v2/v3 format uses packages.dependencies
+    if (lockfile.packages) {
+      for (const [path, pkg] of Object.entries(lockfile.packages)) {
+        if (path === '' || !pkg || typeof pkg !== 'object') continue;
+        
+        const pkgData = pkg as Record<string, unknown>;
+        const name = path.replace('node_modules/', '').split('/node_modules/').pop() || '';
+        const version = (pkgData.version as string) || '';
+        
+        if (name && version) {
+          const key = `${name}@${version}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            dependencies.push({
+              name,
+              version,
+              versionSpec: version,
+              ecosystem: 'npm',
+              file: filePath,
+              isDev: pkgData.dev === true,
+              isPinned: true,
+            });
+          }
+        }
+      }
+    }
+    
+    // v1 format uses dependencies
+    if (lockfile.dependencies) {
+      for (const [name, dep] of Object.entries(lockfile.dependencies)) {
+        if (!dep || typeof dep !== 'object') continue;
+        
+        const depData = dep as Record<string, unknown>;
+        const version = (depData.version as string) || '';
+        
+        if (version) {
+          const key = `${name}@${version}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            dependencies.push({
+              name,
+              version,
+              versionSpec: version,
+              ecosystem: 'npm',
+              file: filePath,
+              isDev: depData.dev === true,
+              isPinned: true,
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Invalid JSON, skip
+  }
+  
+  return dependencies;
+}
+
+function parseYarnLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const seen = new Set<string>();
+  
+  try {
+    // Yarn lockfile v1 format: entries start with a quoted key like "pkg@version":
+    // followed by indented properties. Entries are separated by lines that aren't indented.
+    const lines = content.split('\n');
+    let currentEntry: string[] = [];
+    let inEntry = false;
+    
+    const flushEntry = () => {
+      if (currentEntry.length === 0) return;
+      
+      const firstLine = currentEntry[0].trim();
+      // Parse package spec from first line: "name@version": or name@version:
+      const specMatch = firstLine.match(/^"?([^@\s]+)@(.+?)"?:?$/);
+      if (!specMatch) {
+        currentEntry = [];
+        return;
+      }
+      
+      let name = specMatch[1];
+      const versionLine = currentEntry.find(l => l.trim().startsWith('version'));
+      if (!versionLine) {
+        currentEntry = [];
+        return;
+      }
+      
+      const versionMatch = versionLine.match(/version\s+"([^"]+)"/);
+      if (!versionMatch) {
+        currentEntry = [];
+        return;
+      }
+      
+      const version = versionMatch[1];
+      
+      // Handle npm: protocol for aliased packages
+      if (name.startsWith('npm:')) {
+        const aliasMatch = name.match(/npm:(.+)/);
+        if (aliasMatch) {
+          name = aliasMatch[1].split('@')[0];
+        }
+      }
+      
+      const key = `${name}@${version}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        
+        // Check if dev dependency - yarn uses "dev: true" at entry level
+        const isDev = currentEntry.some(l => l.trim() === 'dev: true');
+        
+        dependencies.push({
+          name,
+          version,
+          versionSpec: version,
+          ecosystem: 'npm',
+          file: filePath,
+          isDev,
+          isPinned: true,
+        });
+      }
+      
+      currentEntry = [];
+    };
+    
+    for (const line of lines) {
+      // Skip empty lines and comments
+      if (!line.trim() || line.trim().startsWith('#')) {
+        if (inEntry) flushEntry();
+        inEntry = false;
+        continue;
+      }
+      
+      // New entry starts when we see a non-indented line with package@version
+      if (!line.startsWith(' ') && !line.startsWith('\t')) {
+        if (inEntry) flushEntry();
+        inEntry = true;
+        currentEntry = [line];
+      } else if (inEntry) {
+        currentEntry.push(line);
+      }
+    }
+    
+    // Don't forget the last entry
+    if (inEntry) flushEntry();
+    
+  } catch (error) {
+    // Skip on parse error
+  }
+  
+  return dependencies;
+}
+
+function parsePnpmLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const seen = new Set<string>();
+  
+  try {
+    // Parse packages section from pnpm-lock.yaml
+    // Format: packages:
+    //   /package@version:
+    //     resolution: {integrity: ...}
+    //     engines: {node: '>=18'}
+    const lines = content.split('\n');
+    let inPackages = false;
+    let currentPackage: { name?: string; version?: string } | null = null;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Start of packages section
+      if (trimmed === 'packages:') {
+        inPackages = true;
+        continue;
+      }
+      
+      // End of packages section (new top-level section that isn't indented)
+      // Only break if we see a top-level section (no indentation) that's not packages
+      if (inPackages && trimmed.match(/^[a-z]+:$/) && !line.startsWith(' ') && trimmed !== 'packages:') {
+        // Save the last package before breaking
+        if (currentPackage?.name && currentPackage?.version) {
+          const key = `${currentPackage.name}@${currentPackage.version}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            dependencies.push({
+              name: currentPackage.name,
+              version: currentPackage.version,
+              versionSpec: currentPackage.version,
+              ecosystem: 'npm',
+              file: filePath,
+              isPinned: true,
+            });
+          }
+        }
+        break;
+      }
+      
+      if (!inPackages) continue;
+      
+      // Parse package entry: /package@version: or package@version:
+      const pkgMatch = trimmed.match(/^\/?([^@/][^@]*)@(.+):$/);
+      if (pkgMatch) {
+        if (currentPackage?.name && currentPackage?.version) {
+          const key = `${currentPackage.name}@${currentPackage.version}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            dependencies.push({
+              name: currentPackage.name,
+              version: currentPackage.version,
+              versionSpec: currentPackage.version,
+              ecosystem: 'npm',
+              file: filePath,
+              isPinned: true,
+            });
+          }
+        }
+        currentPackage = {
+          name: pkgMatch[1],
+          version: pkgMatch[2],
+        };
+      }
+    }
+    
+    // Don't forget the last package
+    if (currentPackage?.name && currentPackage?.version) {
+      const key = `${currentPackage.name}@${currentPackage.version}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        dependencies.push({
+          name: currentPackage.name,
+          version: currentPackage.version,
+          versionSpec: currentPackage.version,
+          ecosystem: 'npm',
+          file: filePath,
+          isPinned: true,
+        });
+      }
+    }
+  } catch (error) {
+    // Skip on parse error
+  }
+  
+  return dependencies;
+}
+
+function parseBunLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const seen = new Set<string>();
+  
+  try {
+    // Bun lock can be JSON or text format
+    // Try JSON first
+    const lockfile = JSON.parse(content);
+    
+    if (lockfile.packages) {
+      for (const [key, pkg] of Object.entries(lockfile.packages)) {
+        if (!pkg || typeof pkg !== 'object') continue;
+        
+        // key format: package@version or npm:package@version
+        const pkgKey = key.replace(/^npm:/, '');
+        const atIndex = pkgKey.lastIndexOf('@');
+        if (atIndex <= 0) continue;
+        
+        const name = pkgKey.slice(0, atIndex);
+        const version = pkgKey.slice(atIndex + 1);
+        
+        if (name && version && !seen.has(key)) {
+          seen.add(key);
+          const pkgData = pkg as Record<string, unknown>;
+          dependencies.push({
+            name,
+            version,
+            versionSpec: version,
+            ecosystem: 'npm',
+            file: filePath,
+            isDev: pkgData.dev === true,
+            isPinned: true,
+          });
+        }
+      }
+    }
+  } catch {
+    // Not valid JSON, try text format
+    // Text format: package@version entries
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      // Parse format: package@version or npm:package@version
+      const match = trimmed.match(/^(?:npm:)?([^@\s]+)@([^\s,]+)/);
+      if (match) {
+        const name = match[1];
+        const version = match[2];
+        const key = `${name}@${version}`;
+        
+        if (!seen.has(key)) {
+          seen.add(key);
+          dependencies.push({
+            name,
+            version,
+            versionSpec: version,
+            ecosystem: 'npm',
+            file: filePath,
+            isPinned: true,
+          });
+        }
+      }
+    }
   }
   
   return dependencies;
@@ -116,6 +451,148 @@ function cleanVersion(version: string): string {
     .split(',')[0] // Take first version if multiple
     .split('||')[0] // Take first version if OR
     .trim();
+}
+
+function parsePoetryLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const seen = new Set<string>();
+  
+  try {
+    // Poetry.lock is a TOML file format
+    const lines = content.split('\n');
+    let inPackage = false;
+    let currentPackage: { name?: string; version?: string; category?: string } | null = null;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Start of a new package entry: [[package]]
+      if (trimmed === '[[package]]') {
+        // Save previous package
+        if (currentPackage?.name && currentPackage?.version) {
+          const key = `${currentPackage.name}@${currentPackage.version}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            dependencies.push({
+              name: currentPackage.name,
+              version: currentPackage.version,
+              versionSpec: currentPackage.version,
+              ecosystem: 'pypi',
+              file: filePath,
+              isDev: currentPackage.category === 'dev',
+              isPinned: true, // Poetry.lock versions are always pinned
+            });
+          }
+        }
+        currentPackage = {};
+        inPackage = true;
+        continue;
+      }
+      
+      if (!inPackage || !currentPackage) continue;
+      
+      // Parse name
+      const nameMatch = trimmed.match(/^name\s*=\s*"([^"]+)"/);
+      if (nameMatch) {
+        currentPackage.name = nameMatch[1];
+      }
+      
+      // Parse version
+      const versionMatch = trimmed.match(/^version\s*=\s*"([^"]+)"/);
+      if (versionMatch) {
+        currentPackage.version = versionMatch[1];
+      }
+      
+      // Parse category (dev vs main)
+      const categoryMatch = trimmed.match(/^category\s*=\s*"([^"]+)"/);
+      if (categoryMatch) {
+        currentPackage.category = categoryMatch[1];
+      }
+    }
+    
+    // Don't forget the last package
+    if (currentPackage?.name && currentPackage?.version) {
+      const key = `${currentPackage.name}@${currentPackage.version}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        dependencies.push({
+          name: currentPackage.name,
+          version: currentPackage.version,
+          versionSpec: currentPackage.version,
+          ecosystem: 'pypi',
+          file: filePath,
+          isDev: currentPackage.category === 'dev',
+          isPinned: true,
+        });
+      }
+    }
+  } catch (error) {
+    // Skip on parse error
+  }
+  
+  return dependencies;
+}
+
+function parsePipfileLock(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  
+  try {
+    const lockfile = JSON.parse(content);
+    
+    // Parse default (production) dependencies
+    if (lockfile.default) {
+      for (const [name, pkg] of Object.entries(lockfile.default)) {
+        if (!pkg || typeof pkg !== 'object') continue;
+        
+        const pkgData = pkg as Record<string, unknown>;
+        const version = (pkgData.version as string) || '';
+        
+        if (version) {
+          // Version is typically "==1.0.0" format, clean it up
+          const cleanVersion = version.replace(/^==/, '');
+          
+          dependencies.push({
+            name,
+            version: cleanVersion,
+            versionSpec: version,
+            ecosystem: 'pypi',
+            file: filePath,
+            isDev: false,
+            isPinned: true, // Pipfile.lock versions are always pinned
+          });
+        }
+      }
+    }
+    
+    // Parse develop (dev) dependencies
+    if (lockfile.develop) {
+      for (const [name, pkg] of Object.entries(lockfile.develop)) {
+        if (!pkg || typeof pkg !== 'object') continue;
+        
+        const pkgData = pkg as Record<string, unknown>;
+        const version = (pkgData.version as string) || '';
+        
+        if (version) {
+          // Version is typically "==1.0.0" format, clean it up
+          const cleanVersion = version.replace(/^==/, '');
+          
+          dependencies.push({
+            name,
+            version: cleanVersion,
+            versionSpec: version,
+            ecosystem: 'pypi',
+            file: filePath,
+            isDev: true,
+            isPinned: true,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    // Invalid JSON, skip
+  }
+  
+  return dependencies;
 }
 
 function parseCargoToml(content: string, filePath: string): Dependency[] {
@@ -359,6 +836,46 @@ function parseGoSum(content: string, filePath: string): Dependency[] {
     }
   }
   
+  return dependencies;
+}
+
+function parseGemfile(content: string, filePath: string): Dependency[] {
+  const dependencies: Dependency[] = [];
+  const lines = content.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    // Parse gem declarations
+    // Format: gem 'name', 'version' or gem "name", "version"
+    // Also supports: gem 'name', '~> 1.0' or gem 'name', '>= 1.0'
+    // Development gems: gem 'name', group: :development
+    // Or: gem 'name', groups: [:development, :test]
+    const gemMatch = trimmed.match(/^gem\s+['"]([^'"]+)['"](?:\s*,\s*['"]([^'"]+)['"])?/);
+    if (gemMatch) {
+      const name = gemMatch[1];
+      const versionSpec = gemMatch[2] || '*';
+
+      // Check if it's a dev dependency by looking for group: :development or groups containing :development
+      const isDev = /group[s]?\s*:\s*\[?[^\]]*:development[^\]]*\]?/.test(trimmed) ||
+                      /group\s*:\s*development/.test(trimmed);
+
+      dependencies.push({
+        name,
+        version: cleanVersion(versionSpec),
+        versionSpec,
+        ecosystem: 'ruby',
+        file: filePath,
+        isDev,
+      });
+    }
+  }
+
   return dependencies;
 }
 

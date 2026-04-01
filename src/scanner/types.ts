@@ -1,6 +1,6 @@
 export interface DependencyFile {
   path: string;
-  type: 'package.json' | 'requirements.txt' | 'Cargo.toml' | 'Cargo.lock' | 'go.mod' | 'go.sum' | 'Gemfile.lock';
+  type: 'package.json' | 'package-lock.json' | 'yarn.lock' | 'pnpm-lock.yaml' | 'bun.lock' | 'requirements.txt' | 'poetry.lock' | 'Pipfile.lock' | 'Cargo.toml' | 'Cargo.lock' | 'go.mod' | 'go.sum' | 'Gemfile' | 'Gemfile.lock';
   relativePath: string;
 }
 
