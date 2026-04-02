@@ -40,8 +40,15 @@ export function PinningTab({ data }: PinningTabProps) {
         groups.get(dep.file)!.push(dep);
       }
     });
+    // Sort entries so that files without 'node_modules' appear first
+    const sortedEntries = Array.from(groups.entries()).sort(([aPath], [bPath]) => {
+      const aHasNodeModules = aPath.includes('node_modules') ? 1 : 0;
+      const bHasNodeModules = bPath.includes('node_modules') ? 1 : 0;
+      return aHasNodeModules - bHasNodeModules;
+    });
 
-    return groups;
+    return new Map(sortedEntries);
+
   }, [reportData.dependencies]);
 
   useEffect(() => {
@@ -172,25 +179,21 @@ export function PinningTab({ data }: PinningTabProps) {
       <div style={{ marginBottom: '1.5rem' }}>
         <h3 style={{ marginBottom: '1rem' }}>Select a file to view pinning issues:</h3>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {Array.from(fileGroups.entries()).map(([filePath, deps]) => (
-            <button
-              key={filePath}
-              onClick={() => loadFile(filePath)}
-              style={{
-                padding: '0.75rem 1rem',
-                background: selectedFile?.path === filePath ? 'var(--accent-amber)' : 'var(--bg-secondary)',
-                border: `1px solid ${selectedFile?.path === filePath ? 'var(--accent-amber)' : 'var(--border)'}`,
-                borderRadius: '8px',
-                color: selectedFile?.path === filePath ? 'white' : 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontFamily: 'monospace',
-                transition: 'all 0.2s',
+          <div className="select-wrapper">
+            <select 
+              className="filter-select"
+              onChange={(e) => {
+                loadFile(e.target.value)
               }}
+              aria-label="Select file with non-pinned dependencies"
             >
-              {filePath.split('/').pop()} ({deps.length})
-            </button>
-          ))}
+            {Array.from(fileGroups.entries()).map(([filePath, deps]) => 
+              <option key={filePath} value={filePath}>
+                {filePath} ({deps.length})
+              </option>
+            )}
+            </select>
+          </div>
         </div>
       </div>
 
