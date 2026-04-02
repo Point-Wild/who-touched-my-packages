@@ -1,6 +1,6 @@
 {
   "name": "who-touched-my-packages",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A beautiful CLI tool for auditing dependencies and finding vulnerabilities",
   "type": "module",
   "bin": {
