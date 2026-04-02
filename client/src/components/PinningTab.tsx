@@ -185,6 +185,7 @@ export function PinningTab({ data }: PinningTabProps) {
               onChange={(e) => {
                 loadFile(e.target.value)
               }}
+              aria-label="Select file with non-pinned dependencies"
             >
             {Array.from(fileGroups.entries()).map(([filePath, deps]) => 
               <option key={filePath} value={filePath}>
