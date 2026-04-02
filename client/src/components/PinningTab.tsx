@@ -193,8 +193,6 @@ export function PinningTab({ data }: PinningTabProps) {
             )}
             </select>
           </div>
-          
-          
         </div>
       </div>
 
