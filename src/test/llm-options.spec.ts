@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict';
-import { resolveApiKey } from './src/supply-chain/utils.js';
-import { resolveModel } from './src/supply-chain/llm/models.js';
-import type { LLMProvider } from './src/supply-chain/llm/models.js';
+import type { LLMProvider } from '../supply-chain/llm/models.js';
+import { resolveModel } from '../supply-chain/llm/models.js';
+import { resolveApiKey } from '../supply-chain/utils.js';
 
 interface TestLLMOptions {
   provider?: LLMProvider;
@@ -24,8 +23,8 @@ export function parseTestLLMOptions(testFileName: string): TestLLMOptions {
 
     if (arg === '--llm-provider') {
       const value = process.argv[index + 1];
-      assert(value, `Missing value for --llm-provider in ${testFileName}`);
-      assert(isLLMProvider(value), `Unsupported --llm-provider "${value}" in ${testFileName}`);
+      if (!value) throw new Error(`Missing value for --llm-provider in ${testFileName}`);
+      if (!isLLMProvider(value)) throw new Error(`Unsupported --llm-provider "${value}" in ${testFileName}`);
       provider = value;
       index++;
       continue;
@@ -33,7 +32,7 @@ export function parseTestLLMOptions(testFileName: string): TestLLMOptions {
 
     if (arg === '--supply-chain-model') {
       const value = process.argv[index + 1];
-      assert(value, `Missing value for --supply-chain-model in ${testFileName}`);
+      if (!value) throw new Error(`Missing value for --supply-chain-model in ${testFileName}`);
       model = value;
       index++;
       continue;
@@ -52,7 +51,7 @@ export function parseTestLLMOptions(testFileName: string): TestLLMOptions {
   const envModel = process.env.npm_config_supply_chain_model;
 
   if (!provider && envProvider && envProvider !== 'true') {
-    assert(isLLMProvider(envProvider), `Unsupported npm_config_llm_provider "${envProvider}" in ${testFileName}`);
+    if (!isLLMProvider(envProvider)) throw new Error(`Unsupported npm_config_llm_provider "${envProvider}" in ${testFileName}`);
     provider = envProvider;
   }
 
@@ -61,7 +60,7 @@ export function parseTestLLMOptions(testFileName: string): TestLLMOptions {
   }
 
   if (!provider && positionalProvider) {
-    assert(isLLMProvider(positionalProvider), `Unsupported --llm-provider "${positionalProvider}" in ${testFileName}`);
+    if (!isLLMProvider(positionalProvider)) throw new Error(`Unsupported --llm-provider "${positionalProvider}" in ${testFileName}`);
     provider = positionalProvider;
   }
 
