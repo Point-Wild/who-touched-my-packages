@@ -137,7 +137,7 @@ export function App() {
       <div className="header">
         <h1>🛡️ Who Touched My Packages?{repoName ? ` - ${repoName}` : ''}</h1>
         <div className="subtitle">
-          Security Audit Report • {new Date(data?.reportData?.auditResult?.timestamp).toLocaleString()}
+          Security Audit Report • {new Date(data.reportData.auditResult.timestamp).toLocaleString()}
         </div>
         <div className="subtitle" style={{ marginTop: '2px' }}>
           {data.reportData.repositoryUrl ? (
