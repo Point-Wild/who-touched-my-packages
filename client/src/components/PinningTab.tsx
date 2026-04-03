@@ -51,13 +51,7 @@ export function PinningTab({ data }: PinningTabProps) {
 
   }, [reportData.dependencies]);
 
-  useEffect(() => {
-    if (fileGroups.size > 0 && !selectedFile) {
-      const firstFile = Array.from(fileGroups.keys())[0];
-      loadFile(firstFile);
-    }
-  }, [fileGroups]);
-
+  
   useEffect(() => {
     if (containerRef.current && selectedFile) {
       if (editorRef.current) {
@@ -162,17 +156,6 @@ export function PinningTab({ data }: PinningTabProps) {
     }
   };
 
-  if (fileGroups.size === 0) {
-    return (
-      <div className="empty-state">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h2>All Dependencies Pinned!</h2>
-        <p>All your dependencies are using pinned versions. Great job!</p>
-      </div>
-    );
-  }
   // filter fileGroups to remove groups with a single dep whose name is part of the 
   // filePath as there are no dependencies that are unpinned in these cases
   const filteredFileGroups = Array.from(fileGroups.entries()).filter(([filePath, deps]) => {
@@ -187,11 +170,22 @@ export function PinningTab({ data }: PinningTabProps) {
     return true;
   });
 
+  if (fileGroups.size === 0 || filteredFileGroups.length === 0) {
+    return (
+      <div className="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h2>All Dependencies Pinned!</h2>
+        <p>All your dependencies are using pinned versions. Great job!</p>
+      </div>
+    );
+  }
+
   // calculate the counts for direct and transitive dependencies for each file group for display in the dropdown, treating unknown depths as transitive for display purposes
   const depCounts = filteredFileGroups.map(([filePath, deps]) => {
     const counts = deps.reduce((acc, item) => {
-      let value = typeof(item.depth) === 'number' ? item.depth : 'unknown';
-      value = value === 0 ? 0 : 1;
+      const value = item.depth === 0 ? 0 : 1;
       acc[value] = (acc[value] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -205,6 +199,15 @@ export function PinningTab({ data }: PinningTabProps) {
     );
     return { filePath, depths: depthsArr };
   });
+
+  useEffect(() => {
+    if (filteredFileGroups.length > 0 && !selectedFile) {
+      const firstFile = filteredFileGroups[0][0];
+      console.log('firstFile to load = ', firstFile);
+      loadFile(firstFile);
+    }
+  }, [depCounts]);
+
 
   return (
     <>
