@@ -243,7 +243,7 @@ export async function scanWorkflow(
     }
   }
 
-  if (scannedDependencies.length === 0) {
+  if (allDependencies.length === 0) {
     throw new Error('No dependencies found.');
   }
 
@@ -251,7 +251,7 @@ export async function scanWorkflow(
     new OSVDataSource(),
   ]);
 
-  const auditResult = await checker.checkDependencies(scannedDependencies);
+  const auditResult = await checker.checkDependencies(allDependencies);
   logVerbose(`Vulnerability results: ${auditResult.vulnerabilities.length} findings across ${auditResult.scannedPackages} scanned packages`);
   if (auditResult.vulnerabilities.length > 0) {
     logVerboseJson(

@@ -1,4 +1,5 @@
 import * as clack from '@clack/prompts';
+import { spawnSync } from 'node:child_process';
 import { Command } from 'commander';
 import { resolve } from 'node:path';
 import { cwd } from 'node:process';
@@ -91,6 +92,38 @@ if (isCI) {
   options.html = false;
 }
 
+function createSpinner(text: string): ReturnType<typeof ora> {
+  return ora({
+    text,
+    color: 'cyan',
+    discardStdin: false,
+  });
+}
+
+function restoreTerminalInput(): void {
+  if (!process.stdin.isTTY) {
+    return;
+  }
+
+  try {
+    process.stdin.setRawMode?.(false);
+  } catch {
+    // Ignore terminal state restoration errors
+  }
+
+  try {
+    process.stdin.pause();
+  } catch {
+    // Ignore terminal state restoration errors
+  }
+
+  try {
+    spawnSync('stty', ['sane'], { stdio: 'inherit' });
+  } catch {
+    // Ignore terminal state restoration errors
+  }
+}
+
 async function main() {
   const logger = new Logger(options.verbose);
   
@@ -99,10 +132,7 @@ async function main() {
   
   if (options.repo) {
     if (!options.json && !options.quiet) {
-      const spinner = ora({
-        text: `Cloning repository${options.branch ? ` (branch: ${options.branch})` : ''}...`,
-        color: 'cyan',
-      }).start();
+      const spinner = createSpinner(`Cloning repository${options.branch ? ` (branch: ${options.branch})` : ''}...`).start();
       
       try {
         const cloneResult = await cloneRepository({
@@ -145,10 +175,7 @@ async function main() {
   });
   let spinner: ReturnType<typeof ora> | null = null;
   if (!options.json && !options.quiet) {
-    spinner = ora({
-      text: 'Scanning for dependency files...',
-      color: 'cyan',
-    }).start();
+    spinner = createSpinner('Scanning for dependency files...').start();
   }
   const reportData = await scanWorkflow(scanPath, options, spinner);
   let finalReport = buildFinalReport(reportData);
@@ -234,10 +261,7 @@ async function main() {
   
   if (options.html) {
     if (!options.json && !options.quiet) {
-      spinner = ora({
-        text: 'Generating HTML report...',
-        color: 'cyan',
-      }).start();
+      spinner = createSpinner('Generating HTML report...').start();
     }
     
     const server = await reporter.generateHtmlReport(finalReport);
@@ -258,6 +282,7 @@ async function main() {
       }
       
       await open(server.url);
+      restoreTerminalInput();
       
       if (!options.json && !options.quiet) {
         console.log(theme.success(`${icons.success} Report opened in browser!`));
@@ -265,9 +290,11 @@ async function main() {
         console.log(theme.dim('Press Ctrl+C to stop the server\n'));
       }
     }
+
+    restoreTerminalInput();
     
-    // Keep the process running
-    process.on('SIGINT', async () => {
+    const shutdown = async () => {
+      restoreTerminalInput();
       if (!options.json && !options.quiet) {
         console.log(theme.dim('\n\nShutting down server...'));
       }
@@ -276,7 +303,10 @@ async function main() {
         await cleanup();
       }
       process.exit(0);
-    });
+    };
+
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
     
     // Don't exit - keep server running
     return;

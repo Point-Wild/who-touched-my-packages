@@ -149,6 +149,10 @@ const LOW_VALUE_PATH_PATTERNS = [
   /api\.spec/i,
   /swagger/i,
   /openapi/i,
+  /\/_next\/static\//i,
+  /\/out\/_next\//i,
+  /\/static\/chunks\//i,
+  /\/assets?\//i,
 ];
 
 /**
