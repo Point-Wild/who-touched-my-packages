@@ -51,13 +51,7 @@ export function PinningTab({ data }: PinningTabProps) {
 
   }, [reportData.dependencies]);
 
-  useEffect(() => {
-    if (fileGroups.size > 0 && !selectedFile) {
-      const firstFile = Array.from(fileGroups.keys())[0];
-      loadFile(firstFile);
-    }
-  }, [fileGroups]);
-
+  
   useEffect(() => {
     if (containerRef.current && selectedFile) {
       if (editorRef.current) {
@@ -162,7 +156,21 @@ export function PinningTab({ data }: PinningTabProps) {
     }
   };
 
-  if (fileGroups.size === 0) {
+  // filter fileGroups to remove groups with a single dep whose name is part of the 
+  // filePath as there are no dependencies that are unpinned in these cases
+  const filteredFileGroups = Array.from(fileGroups.entries()).filter(([filePath, deps]) => {
+    const singleDep = deps.length === 1;
+    if (singleDep) {
+      const dep = deps[0]
+      if (!filePath.includes(dep.name)) {
+        return true;
+      }
+      return false;
+    }
+    return true;
+  });
+
+  if (fileGroups.size === 0 || filteredFileGroups.length === 0) {
     return (
       <div className="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -173,6 +181,33 @@ export function PinningTab({ data }: PinningTabProps) {
       </div>
     );
   }
+
+  // calculate the counts for direct and transitive dependencies for each file group for display in the dropdown, treating unknown depths as transitive for display purposes
+  const depCounts = filteredFileGroups.map(([filePath, deps]) => {
+    const counts = deps.reduce((acc, item) => {
+      const value = item.depth === 0 ? 0 : 1;
+      acc[value] = (acc[value] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const depthsArr = Object.keys(counts).sort((a, b) => {
+      if (a === 'unknown') return 1;
+      if (b === 'unknown') return -1;
+      return parseInt(a) - parseInt(b);
+    }).map(
+      depth => ({d: depth, count: counts[depth]})
+    );
+    return { filePath, depths: depthsArr };
+  });
+
+  useEffect(() => {
+    if (filteredFileGroups.length > 0 && !selectedFile) {
+      const firstFile = filteredFileGroups[0][0];
+      console.log('firstFile to load = ', firstFile);
+      loadFile(firstFile);
+    }
+  }, [depCounts]);
+
 
   return (
     <>
@@ -187,9 +222,11 @@ export function PinningTab({ data }: PinningTabProps) {
               }}
               aria-label="Select file with non-pinned dependencies"
             >
-            {Array.from(fileGroups.entries()).map(([filePath, deps]) => 
+            {depCounts.map(({ filePath, depths }) => 
               <option key={filePath} value={filePath}>
-                {filePath} ({deps.length})
+                {filePath}
+                {depths[0].d === "0" ? ` (${depths[0].count}) direct ` : ` (${depths[0].count}) transitive`}
+                {depths[0].d === "0" && depths[1] ? `, (${depths[1].count}) transitive ` : ''}
               </option>
             )}
             </select>
