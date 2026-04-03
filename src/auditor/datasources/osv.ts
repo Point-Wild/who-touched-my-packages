@@ -144,7 +144,7 @@ export class OSVDataSource extends DataSource {
     vuln: OSVVulnerability,
     dep: Dependency
   ): Vulnerability {
-    const severity = this.extractSeverity(vuln, dep);
+    const severity = this.extractSeverity(vuln);
     const cvss = this.extractCVSS(vuln) ?? this.severityToCvssFloor(severity);
     const fixedVersions = this.extractFixedVersions(vuln);
     const affectedVersions = this.extractAffectedVersions(vuln);
@@ -166,7 +166,7 @@ export class OSVDataSource extends DataSource {
     };
   }
   
-  private extractSeverity(vuln: OSVVulnerability, dep: Dependency): Vulnerability['severity'] {
+  private extractSeverity(vuln: OSVVulnerability): Vulnerability['severity'] {
     const topLevelEntries = vuln.severity ?? [];
     const databaseSpecificEntries = this.extractDatabaseSpecificSeverityEntries(vuln.database_specific);
     const affectedEntries = vuln.affected
