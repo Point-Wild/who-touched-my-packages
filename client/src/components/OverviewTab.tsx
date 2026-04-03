@@ -71,6 +71,10 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
           <div className="label">Low</div>
           <div className="value">{summary.low}</div>
         </div>
+        <div className="stat-card unknown paper">
+          <div className="label">Unknown</div>
+          <div className="value">{summary.unknown}</div>
+        </div>
         <div className="stat-card paper">
           <div className="label">Scanned Packages</div>
           <div className="value">{reportData.auditResult.scannedPackages}</div>

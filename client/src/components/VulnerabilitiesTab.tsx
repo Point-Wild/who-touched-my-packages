@@ -15,7 +15,7 @@ interface TabFinding {
   references: string[];
   cvss?: number;
   source: string;
-  filePaths: string[];
+  files: string[];
 }
 
 export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
@@ -23,12 +23,23 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
 
+  const toRelativePath = (path: string): string => {
+    if (!path) return path;
+
+    if (path.startsWith(reportData.scanPath)) {
+      const relativePath = path.slice(reportData.scanPath.length).replace(/^\/+/, '');
+      return relativePath || '.';
+    }
+
+    return path;
+  };
+
   const vulnerabilitiesWithPaths = useMemo(() => {
     const staticFindings: TabFinding[] = reportData.auditResult.vulnerabilities.map(vuln => {
-      const filePaths = reportData.dependencies
+      const files = reportData.dependencies
         .filter(dep => dep.name === vuln.packageName)
-        .map(dep => dep.file);
-      return { ...vuln, filePaths: [...new Set(filePaths)] };
+        .map(dep => toRelativePath(dep.file));
+      return { ...vuln, files: [...new Set(files)] };
     });
 
     const supplyChainFindings: TabFinding[] = (data.supplyChainReport?.findings ?? []).map(finding => ({
@@ -39,7 +50,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
       title: finding.title,
       references: [],
       source: 'LLM',
-      filePaths: finding.filePath ? [finding.filePath] : [],
+      files: finding.filePath ? [toRelativePath(finding.filePath)] : [],
     }));
 
     return [...staticFindings, ...supplyChainFindings];
@@ -66,7 +77,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
     { key: 'packageVersion' as const, label: 'Version' },
     { key: 'title' as const, label: 'Title' },
     { key: 'cvss' as const, label: 'CVSS' },
-    { key: 'filePaths' as const, label: 'File Paths' },
+    { key: 'files' as const, label: 'File' },
     { key: 'references' as const, label: 'References' },
   ];
 
@@ -125,7 +136,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                 <th>Version</th>
                 <th>Title & References</th>
                 <th>CVSS</th>
-                <th>File Paths</th>
+                <th>File</th>
               </tr>
             </thead>
             <tbody>
@@ -202,17 +213,15 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                     )}
                   </td>
                   <td>
-                    {vuln.filePaths.length > 0 ? (
-                      vuln.filePaths.map((path, i) => (
-                        <div key={i}>
-                          <a
-                            href={`vscode://file${path}`}
-                            className="vscode-link"
-                          >
-                            {path}
-                          </a>
-                        </div>
-                      ))
+                    {vuln.files.length > 0 ? (
+                      <span
+                        style={{
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {vuln.files.join(', ')}
+                      </span>
                     ) : (
                       <span style={{ color: 'var(--text-muted)' }}>N/A</span>
                     )}
