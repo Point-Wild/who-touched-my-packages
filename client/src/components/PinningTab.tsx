@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
-import type { FinalReport, Dependency } from '../types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Dependency, FinalReport } from '../types';
 
 interface PinningTabProps {
   data: FinalReport;
@@ -27,9 +27,7 @@ export function PinningTab({ data }: PinningTabProps) {
       const spec = dep.versionSpec;
       let isNonPinned = false;
 
-      if (dep.ecosystem === 'npm') {
-        isNonPinned = spec.startsWith('^') || spec.startsWith('~') || spec.includes('*') || spec.includes('x') || spec.includes('X') || spec === 'latest';
-      } else if (dep.ecosystem === 'pypi') {
+      if (dep.ecosystem === 'pypi') {
         isNonPinned = !spec.startsWith('==') || spec.includes('>=') || spec.includes('>') || spec.includes('~=') || spec === '*';
       }
 
@@ -169,42 +167,6 @@ export function PinningTab({ data }: PinningTabProps) {
 
   return (
     <>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Select a file to view pinning issues:</h3>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {Array.from(fileGroups.entries()).map(([filePath, deps]) => (
-            <button
-              key={filePath}
-              onClick={() => loadFile(filePath)}
-              style={{
-                padding: '0.75rem 1rem',
-                background: selectedFile?.path === filePath ? 'var(--accent-amber)' : 'var(--bg-secondary)',
-                border: `1px solid ${selectedFile?.path === filePath ? 'var(--accent-amber)' : 'var(--border)'}`,
-                borderRadius: '8px',
-                color: selectedFile?.path === filePath ? 'white' : 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontFamily: 'monospace',
-                transition: 'all 0.2s',
-              }}
-            >
-              {filePath.split('/').pop()} ({deps.length})
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {selectedFile && (
-        <div className="editor-container">
-          <div className="editor-header">
-            <div className="editor-title">{selectedFile.path}</div>
-            <div className="editor-badge">
-              {selectedFile.nonPinnedCount} non-pinned {selectedFile.nonPinnedCount === 1 ? 'dependency' : 'dependencies'}
-            </div>
-          </div>
-          <div className="monaco-editor-wrapper" ref={containerRef}></div>
-        </div>
-      )}
 
       <div style={{
         background: 'var(--bg-secondary)',
@@ -213,13 +175,20 @@ export function PinningTab({ data }: PinningTabProps) {
         border: '1px solid var(--border)',
         marginTop: '1.5rem'
       }}>
-        <h3 style={{ marginBottom: '1rem' }}>💡 Best Practices for Pinning Dependencies</h3>
+        <h3 style={{ marginBottom: '1rem' }}>💡 Best Practices for preventing Supply Chain attacks</h3>
         <ul style={{ color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
-          <li><strong>npm/package.json:</strong> Use exact versions (e.g., <code>"1.2.3"</code>) instead of ranges (<code>"^1.2.3"</code> or <code>"~1.2.3"</code>)</li>
-          <li><strong>Python/requirements.txt:</strong> Use <code>==</code> for exact versions (e.g., <code>package==1.2.3</code>) instead of <code>&gt;=</code> or <code>~=</code></li>
-          <li><strong>Why pin?</strong> Pinned versions ensure reproducible builds and prevent unexpected breaking changes</li>
+          <li><strong>CI/CD & Installation:</strong> Use CI commands (e.g., <code>npm ci</code>) over <code>npm install</code> in all CI/CD workflows. Developers should use CI commands with a "firewall" tool such as <a href="https://socket.dev" target="_blank" rel="noopener">socket.dev</a> to block malicious packages</li>
           <li><strong>Lock files:</strong> Use package-lock.json or poetry.lock for additional version locking</li>
+          <li><strong>Dependency Review:</strong> Regularly review dependencies for security vulnerabilities and update them promptly</li>
+          <li><strong>Vetted Dependencies:</strong> Only use dependencies from trusted sources and maintain a vetted list of approved packages</li>
+          <li><strong>Never implicitly trust:</strong> Never fully trust your dependency providers</li>
+          <li><strong>Use a Firewall:</strong> Use a firewall tool such as <a href="https://socket.dev" target="_blank" rel="noopener">socket.dev</a> to block malicious packages</li>
+          <li><strong>Use a trusted registry:</strong> Use a trusted registry such as <a href="https://jfrog.com/artifactory/" target="_blank" rel="noopener">JFrog Artifactory</a> to block malicious packages</li>
         </ul>
+        <p>
+          While it may seem like the clear solution, dependency pinning <strong>still leaves you vulnerable</strong> to supply chain attacks if your dependency providers are compromised. Pinning dependencies only impacts the top level of your dependency tree, not the transitive dependencies of those dependencies. 
+          The best solution involves a combination of the above practices, with a focus on ensuring that all dependencies are vetted and monitored for security vulnerabilities.
+        </p>
       </div>
     </>
   );
