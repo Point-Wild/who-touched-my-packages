@@ -81,19 +81,6 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
         </div>
       </div>
 
-      {nonPinnedDeps.length > 0 && (
-        <div className="warning-card" onClick={onNavigateToPinning}>
-          <div className="warning-header">
-            <div className="warning-icon">⚠️</div>
-            <div className="warning-title">Non-Pinned Dependencies Detected</div>
-          </div>
-          <div className="warning-description">
-            Found {nonPinnedDeps.length} {nonPinnedDeps.length === 1 ? 'dependency' : 'dependencies'} with non-pinned versions.
-            Click here to view and fix pinning issues in your dependency files.
-          </div>
-        </div>
-      )}
-
       {summary.total > 0 && (
         <div className="chart-container-group">
           <div className="chart-container paper" style={{ marginBottom: '2rem' }}>
