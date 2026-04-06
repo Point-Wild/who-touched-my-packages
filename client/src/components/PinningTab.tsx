@@ -1,214 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import * as monaco from 'monaco-editor';
-import type { FinalReport, Dependency } from '../types';
+import type { FinalReport } from '../types';
 
 interface PinningTabProps {
   data: FinalReport;
 }
 
-interface FileData {
-  path: string;
-  content: string;
-  language: string;
-  nonPinnedLines: number[];
-  nonPinnedCount: number;
-}
-
-export function PinningTab({ data }: PinningTabProps) {
-  const reportData = data.reportData;
-  const [selectedFile, setSelectedFile] = useState<FileData | null>(null);
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const fileGroups = useMemo(() => {
-    const groups = new Map<string, Dependency[]>();
-
-    reportData.dependencies.forEach(dep => {
-      const spec = dep.versionSpec;
-      let isNonPinned = false;
-
-      if (dep.ecosystem === 'npm') {
-        isNonPinned = spec.startsWith('^') || spec.startsWith('~') || spec.includes('*') || spec.includes('x') || spec.includes('X') || spec === 'latest';
-      } else if (dep.ecosystem === 'pypi') {
-        isNonPinned = !spec.startsWith('==') || spec.includes('>=') || spec.includes('>') || spec.includes('~=') || spec === '*';
-      }
-
-      if (isNonPinned) {
-        if (!groups.has(dep.file)) {
-          groups.set(dep.file, []);
-        }
-        groups.get(dep.file)!.push(dep);
-      }
-    });
-    // Sort entries so that files without 'node_modules' appear first
-    const sortedEntries = Array.from(groups.entries()).sort(([aPath], [bPath]) => {
-      const aHasNodeModules = aPath.includes('node_modules') ? 1 : 0;
-      const bHasNodeModules = bPath.includes('node_modules') ? 1 : 0;
-      return aHasNodeModules - bHasNodeModules;
-    });
-
-    return new Map(sortedEntries);
-
-  }, [reportData.dependencies]);
-
-  useEffect(() => {
-    if (fileGroups.size > 0 && !selectedFile) {
-      const firstFile = Array.from(fileGroups.keys())[0];
-      loadFile(firstFile);
-    }
-  }, [fileGroups]);
-
-  useEffect(() => {
-    if (containerRef.current && selectedFile) {
-      if (editorRef.current) {
-        editorRef.current.dispose();
-      }
-
-      const editor = monaco.editor.create(containerRef.current, {
-        value: selectedFile.content,
-        language: selectedFile.language,
-        theme: 'vs-dark',
-        readOnly: true,
-        automaticLayout: true,
-        minimap: { enabled: true },
-        scrollBeyondLastLine: false,
-        fontSize: 14,
-        lineNumbers: 'on',
-        renderWhitespace: 'selection',
-      });
-
-      editorRef.current = editor;
-
-      const decorations = selectedFile.nonPinnedLines.map(lineNum => ({
-        range: new monaco.Range(lineNum, 1, lineNum, 1000),
-        options: {
-          isWholeLine: true,
-          className: 'non-pinned-line',
-          glyphMarginClassName: 'non-pinned-glyph',
-          linesDecorationsClassName: 'non-pinned-decoration',
-          overviewRuler: {
-            color: 'rgba(245, 158, 11, 0.8)',
-            position: monaco.editor.OverviewRulerLane.Full
-          },
-          minimap: {
-            color: 'rgba(245, 158, 11, 0.8)',
-            position: monaco.editor.MinimapPosition.Inline
-          }
-        }
-      }));
-
-      editor.deltaDecorations([], decorations);
-    }
-
-    return () => {
-      if (editorRef.current) {
-        editorRef.current.dispose();
-        editorRef.current = null;
-      }
-    };
-  }, [selectedFile]);
-
-  const loadFile = async (filePath: string) => {
-    try {
-      const response = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`);
-      let content = '';
-
-      if (!response.ok) {
-        content = `# Unable to load file: ${filePath}\n# File may not be accessible\n\n`;
-        content += '# Non-pinned dependencies in this file:\n';
-        const deps = fileGroups.get(filePath) || [];
-        deps.forEach(dep => {
-          content += `# - ${dep.name}: ${dep.versionSpec}\n`;
-        });
-      } else {
-        content = await response.text();
-      }
-
-      const language = filePath.endsWith('.json') ? 'json' : 'plaintext';
-      const deps = fileGroups.get(filePath) || [];
-      const nonPinnedLines: number[] = [];
-
-      const lines = content.split('\n');
-      deps.forEach(dep => {
-        lines.forEach((line, idx) => {
-          if (line.includes(dep.name) && line.includes(dep.versionSpec)) {
-            nonPinnedLines.push(idx + 1);
-          }
-        });
-      });
-
-      setSelectedFile({
-        path: filePath,
-        content,
-        language,
-        nonPinnedLines,
-        nonPinnedCount: deps.length
-      });
-    } catch (error) {
-      const deps = fileGroups.get(filePath) || [];
-      let content = `# Unable to load file: ${filePath}\n# Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`;
-      content += '# Non-pinned dependencies in this file:\n';
-      deps.forEach(dep => {
-        content += `# - ${dep.name}: ${dep.versionSpec}\n`;
-      });
-
-      setSelectedFile({
-        path: filePath,
-        content,
-        language: 'plaintext',
-        nonPinnedLines: [],
-        nonPinnedCount: deps.length
-      });
-    }
-  };
-
-  if (fileGroups.size === 0) {
-    return (
-      <div className="empty-state">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h2>All Dependencies Pinned!</h2>
-        <p>All your dependencies are using pinned versions. Great job!</p>
-      </div>
-    );
-  }
-
+export function PinningTab({}: PinningTabProps) {
   return (
     <>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Select a file to view pinning issues:</h3>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <div className="select-wrapper">
-            <select 
-              className="filter-select"
-              onChange={(e) => {
-                loadFile(e.target.value)
-              }}
-              aria-label="Select file with non-pinned dependencies"
-            >
-            {Array.from(fileGroups.entries()).map(([filePath, deps]) => 
-              <option key={filePath} value={filePath}>
-                {filePath} ({deps.length})
-              </option>
-            )}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {selectedFile && (
-        <div className="editor-container">
-          <div className="editor-header">
-            <div className="editor-title">{selectedFile.path}</div>
-            <div className="editor-badge">
-              {selectedFile.nonPinnedCount} non-pinned {selectedFile.nonPinnedCount === 1 ? 'dependency' : 'dependencies'}
-            </div>
-          </div>
-          <div className="monaco-editor-wrapper" ref={containerRef}></div>
-        </div>
-      )}
-
       <div style={{
         background: 'var(--bg-secondary)',
         padding: '1.5rem',
@@ -216,13 +14,20 @@ export function PinningTab({ data }: PinningTabProps) {
         border: '1px solid var(--border)',
         marginTop: '1.5rem'
       }}>
-        <h3 style={{ marginBottom: '1rem' }}>💡 Best Practices for Pinning Dependencies</h3>
+        <h3 style={{ marginBottom: '1rem' }}>💡 Best Practices for preventing Supply Chain attacks</h3>
         <ul style={{ color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
-          <li><strong>npm/package.json:</strong> Use exact versions (e.g., <code>"1.2.3"</code>) instead of ranges (<code>"^1.2.3"</code> or <code>"~1.2.3"</code>)</li>
-          <li><strong>Python/requirements.txt:</strong> Use <code>==</code> for exact versions (e.g., <code>package==1.2.3</code>) instead of <code>&gt;=</code> or <code>~=</code></li>
-          <li><strong>Why pin?</strong> Pinned versions ensure reproducible builds and prevent unexpected breaking changes</li>
+          <li><strong>CI/CD & Installation:</strong> Use CI commands (e.g., <code>npm ci</code>) over <code>npm install</code> in all CI/CD workflows. Developers should use CI commands with a "firewall" tool such as <a href="https://socket.dev" target="_blank" rel="noopener">socket.dev</a> to block malicious packages</li>
           <li><strong>Lock files:</strong> Use package-lock.json or poetry.lock for additional version locking</li>
+          <li><strong>Dependency Review:</strong> Regularly review dependencies for security vulnerabilities and update them promptly</li>
+          <li><strong>Vetted Dependencies:</strong> Only use dependencies from trusted sources and maintain a vetted list of approved packages</li>
+          <li><strong>Never implicitly trust:</strong> Never fully trust your dependency providers</li>
+          <li><strong>Use a Firewall:</strong> Use a firewall tool such as <a href="https://socket.dev" target="_blank" rel="noopener">socket.dev</a> to block malicious packages</li>
+          <li><strong>Use a trusted registry:</strong> Use a trusted registry such as <a href="https://jfrog.com/artifactory/" target="_blank" rel="noopener">JFrog Artifactory</a> to block malicious packages</li>
         </ul>
+        <p>
+          While it may seem like the clear solution, dependency pinning <strong>still leaves you vulnerable</strong> to supply chain attacks if your dependency providers are compromised. Pinning dependencies only impacts the top level of your dependency tree, not the transitive dependencies of those dependencies. 
+          The best solution involves a combination of the above practices, with a focus on ensuring that all dependencies are vetted and monitored for security vulnerabilities.
+        </p>
       </div>
     </>
   );
