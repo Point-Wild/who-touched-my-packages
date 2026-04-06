@@ -9,7 +9,19 @@ interface OverviewTabProps {
 
 export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
   const reportData = data.reportData;
-  const { summary } = reportData.auditResult;
+  const summary = useMemo(() => {
+    const staticSummary = reportData.auditResult.summary;
+    const supplyChainSummary = data.supplyChainReport?.summary;
+
+    return {
+      total: staticSummary.total + (supplyChainSummary?.totalFindings ?? 0),
+      critical: staticSummary.critical + (supplyChainSummary?.critical ?? 0),
+      high: staticSummary.high + (supplyChainSummary?.high ?? 0),
+      medium: staticSummary.medium + (supplyChainSummary?.medium ?? 0),
+      low: staticSummary.low + (supplyChainSummary?.low ?? 0),
+      unknown: staticSummary.unknown,
+    };
+  }, [data.supplyChainReport?.summary, reportData.auditResult.summary]);
 
   const nonPinnedDeps = useMemo(() => {
     return reportData.dependencies.filter(dep => {
@@ -25,10 +37,16 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
   }, [reportData.dependencies]);
 
   const vulnerablePackages = useMemo(() => {
-    return new Set(reportData.auditResult.vulnerabilities.map(v => v.packageName));
-  }, [reportData]);
+    return new Set(
+      data.aggregatedReport.aggregatedFindings.map(
+        finding => `${finding.ecosystem}:${finding.packageName}@${finding.packageVersion}`
+      )
+    );
+  }, [data.aggregatedReport.aggregatedFindings]);
 
-  const vulnerableDependencies = reportData.dependencies.filter(dep => vulnerablePackages.has(dep.name)).length;
+  const vulnerableDependencies = reportData.dependencies.filter(dep =>
+    vulnerablePackages.has(`${dep.ecosystem}:${dep.name}@${dep.version}`)
+  ).length;
   const nonVulnerableDependencies = reportData.dependencies.length - vulnerableDependencies;
   return (
     <>
@@ -52,6 +70,10 @@ export function OverviewTab({ data, onNavigateToPinning }: OverviewTabProps) {
         <div className="stat-card low paper">
           <div className="label">Low</div>
           <div className="value">{summary.low}</div>
+        </div>
+        <div className="stat-card unknown paper">
+          <div className="label">Unknown</div>
+          <div className="value">{summary.unknown}</div>
         </div>
         <div className="stat-card paper">
           <div className="label">Scanned Packages</div>

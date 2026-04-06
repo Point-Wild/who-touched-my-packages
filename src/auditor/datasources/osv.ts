@@ -24,6 +24,10 @@ interface OSVVulnerability {
       name: string;
       ecosystem: string;
     };
+    severity?: Array<{
+      type: string;
+      score: string;
+    }>;
     ranges?: Array<{
       type: string;
       events: Array<{
@@ -38,6 +42,13 @@ interface OSVVulnerability {
     url: string;
   }>;
   published?: string;
+  database_specific?: {
+    severity?: string | Array<{
+      type?: string;
+      score?: string;
+    }>;
+    [key: string]: unknown;
+  };
 }
 
 interface OSVResponse {
@@ -134,7 +145,7 @@ export class OSVDataSource extends DataSource {
     dep: Dependency
   ): Vulnerability {
     const severity = this.extractSeverity(vuln);
-    const cvss = this.extractCVSS(vuln);
+    const cvss = this.extractCVSS(vuln) ?? this.severityToCvssFloor(severity);
     const fixedVersions = this.extractFixedVersions(vuln);
     const affectedVersions = this.extractAffectedVersions(vuln);
     
@@ -156,12 +167,26 @@ export class OSVDataSource extends DataSource {
   }
   
   private extractSeverity(vuln: OSVVulnerability): Vulnerability['severity'] {
-    if (!vuln.severity || vuln.severity.length === 0) {
-      return 'UNKNOWN';
-    }
-    
-    for (const sev of vuln.severity) {
-      if (sev.type === 'CVSS_V3') {
+    const topLevelEntries = vuln.severity ?? [];
+    const databaseSpecificEntries = this.extractDatabaseSpecificSeverityEntries(vuln.database_specific);
+    const affectedEntries = vuln.affected
+      ?.flatMap(affected => affected.severity ?? []) ?? [];
+
+    const severity =
+      this.extractSeverityFromEntries(topLevelEntries) ??
+      this.extractSeverityFromEntries(databaseSpecificEntries) ??
+      this.extractSeverityFromEntries(affectedEntries);
+
+    return severity ?? this.inferSeverityWithoutCVSS(vuln);
+  }
+
+  private extractSeverityFromEntries(
+    entries: Array<{ type?: string; score?: string }>
+  ): Vulnerability['severity'] | undefined {
+    for (const sev of entries) {
+      if (!sev.score) continue;
+
+      if (!sev.type || sev.type === 'CVSS_V3') {
         const score = this.parseCVSSScore(sev.score);
         if (score === undefined) continue;
         if (score >= 9.0) return 'CRITICAL';
@@ -170,7 +195,104 @@ export class OSVDataSource extends DataSource {
         return 'LOW';
       }
     }
-    
+
+    return undefined;
+  }
+
+  private extractDatabaseSpecificSeverityEntries(
+    databaseSpecific: OSVVulnerability['database_specific']
+  ): Array<{ type?: string; score?: string }> {
+    if (!databaseSpecific?.severity) {
+      return [];
+    }
+
+    if (typeof databaseSpecific.severity === 'string') {
+      const normalized = databaseSpecific.severity.toUpperCase();
+      if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(normalized)) {
+        return [{ score: String(this.severityToCvssFloor(normalized as Vulnerability['severity'])) }];
+      }
+      return [];
+    }
+
+    if (Array.isArray(databaseSpecific.severity)) {
+      return databaseSpecific.severity;
+    }
+
+    return [];
+  }
+
+  private severityToCvssFloor(severity: Vulnerability['severity']): number {
+    switch (severity) {
+      case 'CRITICAL':
+        return 9.0;
+      case 'HIGH':
+        return 7.0;
+      case 'MEDIUM':
+        return 4.0;
+      case 'LOW':
+        return 0.1;
+      default:
+        return 0;
+    }
+  }
+
+  private inferSeverityWithoutCVSS(vuln: OSVVulnerability): Vulnerability['severity'] {
+    const id = vuln.id.toUpperCase();
+    const text = `${vuln.summary ?? ''}\n${vuln.details ?? ''}`.toLowerCase();
+
+    if (id.startsWith('MAL-')) {
+      return 'CRITICAL';
+    }
+
+    const criticalIndicators = [
+        'malicious package',
+        'malicious code',
+        'backdoor',
+        'trojan',
+        'stealer',
+        'credential harvesting',
+        'credential harvester',
+        'exfiltrat',
+        'supply chain attack',
+        'automatically activated malware',
+    ];
+
+    if (criticalIndicators.some(indicator => text.includes(indicator))) {
+      return 'CRITICAL';
+    }
+
+    const highIndicators = [
+        'remote code execution',
+        'arbitrary code execution',
+        'command execution',
+        'sql injection',
+        'template injection',
+        'server-side request forgery',
+        'authentication bypass',
+        'privilege escalation',
+        'sandbox escape',
+        'path traversal',
+    ];
+
+    if (highIndicators.some(indicator => text.includes(indicator))) {
+      return 'HIGH';
+    }
+
+    const mediumIndicators = [
+        'prototype pollution',
+        'deserialization',
+        'cross-site scripting',
+        'information disclosure',
+        'denial of service',
+        'xxe',
+        'xml external entity',
+        'open redirect',
+    ];
+
+    if (mediumIndicators.some(indicator => text.includes(indicator))) {
+      return 'MEDIUM';
+    }
+
     return 'UNKNOWN';
   }
   

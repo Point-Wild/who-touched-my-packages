@@ -256,6 +256,7 @@ export async function analyzePackageWithModel(
                 packageName: meta.name,
                 packageVersion: source.version,
                 ecosystem: meta.ecosystem,
+                filePath: triageEntry.filePath,
                 category: f.category ?? 'code-obfuscation',
                 severity: normalizeSeverity(f.severity),
                 confidence: typeof f.confidence === 'number' ? Math.max(0, Math.min(1, f.confidence)) : 0.5,

@@ -38,8 +38,15 @@ export function PinningTab({ data }: PinningTabProps) {
         groups.get(dep.file)!.push(dep);
       }
     });
+    // Sort entries so that files without 'node_modules' appear first
+    const sortedEntries = Array.from(groups.entries()).sort(([aPath], [bPath]) => {
+      const aHasNodeModules = aPath.includes('node_modules') ? 1 : 0;
+      const bHasNodeModules = bPath.includes('node_modules') ? 1 : 0;
+      return aHasNodeModules - bHasNodeModules;
+    });
 
-    return groups;
+    return new Map(sortedEntries);
+
   }, [reportData.dependencies]);
 
   useEffect(() => {
@@ -167,7 +174,6 @@ export function PinningTab({ data }: PinningTabProps) {
 
   return (
     <>
-
       <div style={{
         background: 'var(--bg-secondary)',
         padding: '1.5rem',
