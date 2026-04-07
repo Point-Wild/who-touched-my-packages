@@ -7,12 +7,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { parseTestLLMOptions } from './test-llm-options.js';
-import { downloadAndExtractTarGz } from './src/supply-chain/registry/tarball.js';
-import { formatTriageResults } from './src/supply-chain/llm/tools.js';
-import { createChatModel } from './src/supply-chain/llm/client.js';
-import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-chain/nodes/primary-analysis.js';
-import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
+import { parseTestLLMOptions } from './helpers/llm-options.js';
+import { downloadAndExtractTarGz } from '../src/supply-chain/registry/tarball.js';
+import { formatTriageResults } from '../src/supply-chain/llm/tools.js';
+import { createChatModel } from '../src/supply-chain/llm/client.js';
+import { analyzePackageWithModel, planPackageInvestigation } from '../src/supply-chain/nodes/primary-analysis.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../src/supply-chain/types.js';
 
 const PYPI_TEXT_PATTERN = /\.(py|js|ts|sh|json|yml|yaml|toml|cfg|ini|txt|md|pth|bat|ps1)$/i;
 
@@ -25,7 +25,7 @@ const TARGETS = [
   },
 ];
 
-const llmOptions = parseTestLLMOptions('test-llm-python-package.ts');
+const llmOptions = parseTestLLMOptions('llm-python-package.test.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {

