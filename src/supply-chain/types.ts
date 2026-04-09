@@ -41,6 +41,22 @@ export interface RegistrySignals {
 }
 
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type LLMNodeName = 'primary_analysis' | 'deep_investigation';
+
+export interface LLMUsageMetrics {
+  node: LLMNodeName;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  costEstimateAvailable: boolean;
+}
+
+export interface SupplyChainLLMUsage {
+  byNode: Record<LLMNodeName, LLMUsageMetrics>;
+  total: LLMUsageMetrics;
+}
 
 export interface SupplyChainFinding {
   packageName: string;
@@ -69,6 +85,7 @@ export interface PackageFetchError {
 export interface SupplyChainReport {
   findings: SupplyChainFinding[];
   fetchErrors: PackageFetchError[];
+  llmUsage: SupplyChainLLMUsage;
   summary: {
     packagesAnalyzed: number;
     packagesWithFindings: number;
@@ -140,5 +157,6 @@ export interface AnalysisState {
   fetchErrors: PackageFetchError[];
   primaryFindings: SupplyChainFinding[];
   deepFindings: SupplyChainFinding[];
+  llmUsage: SupplyChainLLMUsage;
   result?: SupplyChainReport;
 }

@@ -6,6 +6,7 @@ import { fetchMetadataNode } from './nodes/fetch-metadata.js';
 import { primaryAnalysisNode } from './nodes/primary-analysis.js';
 import { deepInvestigationNode } from './nodes/deep-investigation.js';
 import { aggregateNode } from './nodes/aggregate.js';
+import { createEmptyLLMUsage, createSingleNodeUsage, mergeLLMUsage } from './usage.js';
 
 // LangGraph state definition
 const AnalysisAnnotation = Annotation.Root({
@@ -32,6 +33,10 @@ const AnalysisAnnotation = Annotation.Root({
   allFindings: Annotation<SupplyChainFinding[]>({
     reducer: (_prev, next) => next,
     default: () => [],
+  }),
+  llmUsage: Annotation<ReturnType<typeof createEmptyLLMUsage>>({
+    reducer: (prev, next) => mergeLLMUsage(prev, next),
+    default: () => createEmptyLLMUsage(),
   }),
   result: Annotation<SupplyChainReport | null>({
     reducer: (_prev, next) => next,
@@ -67,7 +72,7 @@ export function buildAnalysisGraph(options: GraphOptions) {
       return { metadata, sources, fetchErrors };
     })
     .addNode('primary_analysis', async (state: AnalysisState) => {
-      const findings = await primaryAnalysisNode(
+      const { findings, usage } = await primaryAnalysisNode(
         state.metadata,
         state.sources,
         chatModel,
@@ -75,16 +80,17 @@ export function buildAnalysisGraph(options: GraphOptions) {
         verbose,
         (done, total) => onProgress?.('Investigating packages', done, total)
       );
-      return { primaryFindings: findings };
+      return { primaryFindings: findings, llmUsage: createSingleNodeUsage('primary_analysis', usage) };
     })
     .addNode('deep_investigation', async (state: AnalysisState) => {
-      const allFindings = await deepInvestigationNode(
+      const { findings: allFindings, usage } = await deepInvestigationNode(
         state.primaryFindings,
         state.sources,
         chatModel,
-        concurrency
+        concurrency,
+        verbose
       );
-      return { allFindings };
+      return { allFindings, llmUsage: createSingleNodeUsage('deep_investigation', usage) };
     })
     .addNode('skip_deep', async (state: AnalysisState) => {
       return { allFindings: state.primaryFindings };
@@ -94,7 +100,8 @@ export function buildAnalysisGraph(options: GraphOptions) {
         state.allFindings,
         state.metadata.size,
         state.fetchErrors,
-        modelName
+        modelName,
+        state.llmUsage
       );
       return { result };
     })

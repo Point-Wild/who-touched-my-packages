@@ -41,6 +41,21 @@ export interface SupplyChainFinding {
   deepInvestigated: boolean;
 }
 
+export interface LLMUsageMetrics {
+  node: 'primary_analysis' | 'deep_investigation';
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  costEstimateAvailable: boolean;
+}
+
+export interface SupplyChainLLMUsage {
+  byNode: Record<'primary_analysis' | 'deep_investigation', LLMUsageMetrics>;
+  total: LLMUsageMetrics;
+}
+
 export interface AggregatedPackageFinding {
   packageName: string;
   packageVersion: string;
@@ -81,6 +96,7 @@ export interface FinalReport {
   supplyChainReport?: {
     findings: SupplyChainFinding[];
     fetchErrors: unknown[];
+    llmUsage: SupplyChainLLMUsage;
     summary: {
       packagesAnalyzed: number;
       packagesWithFindings: number;

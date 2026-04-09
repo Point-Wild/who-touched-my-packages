@@ -1,10 +1,11 @@
 import { HumanMessage, SystemMessage, AIMessage, ToolMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { Runnable } from '@langchain/core/runnables';
-import type { PackageMetadata, PackageSource, SupplyChainFinding } from '../types.js';
+import type { LLMUsageMetrics, PackageMetadata, PackageSource, SupplyChainFinding } from '../types.js';
 import { createPackageTools, buildContentMap, runTriage, formatTriageResults } from '../llm/tools.js';
 import { buildAgentSystemPrompt, buildFileAnalysisPrompt } from '../llm/prompts.js';
 import { pMap } from '../utils.js';
+import { addUsageMetrics, emptyUsageMetrics, usageFromMessage } from '../llm/usage.js';
 
 /** Max LLM rounds per file for the agentic loop (grep, read_file, etc.) */
 const MAX_ROUNDS_PER_FILE = 10;
@@ -41,13 +42,18 @@ async function invokeWithRetry(
   modelWithTools: ToolBoundChatModel,
   messages: any[],
   context: string,
-  verbose: boolean
-): Promise<AIMessage> {
+  verbose: boolean,
+  modelName: string
+): Promise<{ response: AIMessage; usage: LLMUsageMetrics }> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_INVOKE_RETRIES; attempt++) {
     try {
-      return await modelWithTools.invoke(messages);
+      const response = await modelWithTools.invoke(messages);
+      return {
+        response,
+        usage: usageFromMessage(response, modelName, 'primary_analysis'),
+      };
     } catch (error: any) {
       lastError = error;
       const detail = error?.message ?? String(error);
@@ -69,6 +75,59 @@ async function invokeWithRetry(
   throw new Error(`${context}: ${detail}`);
 }
 
+function formatUsageSummary(usage: LLMUsageMetrics): string {
+  const costText = usage.costEstimateAvailable
+    ? `$${usage.estimatedCostUsd.toFixed(4)}`
+    : 'unavailable';
+  return `${usage.calls} call(s), ${usage.inputTokens} input, ${usage.outputTokens} output, ${usage.totalTokens} total, estimated cost ${costText}`;
+}
+
+function messageToText(message: any): string {
+  const content = message?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content.map(block => {
+      if (typeof block === 'string') return block;
+      if (block && typeof block === 'object' && 'text' in block) return String(block.text ?? '');
+      return JSON.stringify(block);
+    }).join('\n');
+  }
+  return content == null ? '' : JSON.stringify(content);
+}
+
+function logConversationInput(packageName: string, filePath: string, round: number, messages: any[]): void {
+  console.log(`  [analyze:${packageName}]   input file ${filePath} round ${round}:`);
+  for (const message of messages) {
+    const type = message?.getType?.() ?? message?.constructor?.name ?? 'message';
+    console.log(`  [analyze:${packageName}]     [${type}]`);
+    console.log(messageToText(message));
+  }
+}
+
+function logConversationOutput(packageName: string, filePath: string, round: number, response: AIMessage): void {
+  console.log(`  [analyze:${packageName}]   output file ${filePath} round ${round}:`);
+  console.log(messageToText(response));
+}
+
+function logPackageFileScores(
+  packageName: string,
+  allContent: Map<string, string>,
+  triageResults: ReturnType<typeof runTriage>,
+  filesToInvestigate: ReturnType<typeof runTriage>
+): void {
+  const triageByPath = new Map(triageResults.map(result => [result.filePath, result]));
+  console.log(`  [triage:${packageName}] package files with risk scores:`);
+  for (const filePath of [...allContent.keys()].sort()) {
+    const triage = triageByPath.get(filePath);
+    const categories = triage ? [...triage.categories].join('+') : 'none';
+    console.log(`  [triage:${packageName}]   [score: ${triage?.score ?? 0}] ${filePath} (categories: ${categories})`);
+  }
+  console.log(`  [triage:${packageName}] files selected for LLM scan:`);
+  for (const triage of filesToInvestigate) {
+    console.log(`  [triage:${packageName}]   [score: ${triage.score}] ${triage.filePath} (categories: ${[...triage.categories].join('+')})`);
+  }
+}
+
 /**
  * Run the tool-calling agent analysis on all packages.
  * For each package, the LLM gets tools to explore the source code interactively.
@@ -80,7 +139,7 @@ export async function primaryAnalysisNode(
   concurrency: number = 3,
   verbose: boolean = false,
   onProgress?: (done: number, total: number) => void
-): Promise<SupplyChainFinding[]> {
+): Promise<{ findings: SupplyChainFinding[]; usage: LLMUsageMetrics }> {
   const findings: SupplyChainFinding[] = [];
 
   const tasks: Array<{ meta: PackageMetadata; source: PackageSource }> = [];
@@ -101,22 +160,26 @@ export async function primaryAnalysisNode(
         if (result.needsLlm) packagesNeedingLlm++;
         done++;
         onProgress?.(done, tasks.length);
-        return result.findings;
+        return result;
       } catch (err: any) {
         const msg = err?.message ?? String(err);
         errors.push({ pkg: meta.name, error: msg });
         packagesNeedingLlm++;
         done++;
         onProgress?.(done, tasks.length);
-        return [];
+        return { findings: [], needsLlm: true, usage: emptyUsageMetrics('primary_analysis') };
       }
     },
     concurrency
   );
 
   for (const r of results) {
-    findings.push(...r);
+    findings.push(...r.findings);
   }
+  const usage = results.reduce(
+    (acc, result) => addUsageMetrics(acc, result.usage),
+    emptyUsageMetrics('primary_analysis')
+  );
 
   // If every package that needed LLM analysis failed, throw so the caller knows
   if (errors.length > 0 && errors.length >= packagesNeedingLlm) {
@@ -133,7 +196,11 @@ export async function primaryAnalysisNode(
     }
   }
 
-  return findings;
+  if (verbose) {
+    console.log(`  [primary] node usage total: ${formatUsageSummary(usage)}`);
+  }
+
+  return { findings, usage };
 }
 
 export function planPackageInvestigation(source: PackageSource): PackageInvestigationPlan {
@@ -167,7 +234,7 @@ export async function analyzePackageWithModel(
   source: PackageSource,
   chatModel: BaseChatModel,
   verbose: boolean
-): Promise<{ findings: SupplyChainFinding[]; needsLlm: boolean }> {
+): Promise<{ findings: SupplyChainFinding[]; needsLlm: boolean; usage: LLMUsageMetrics }> {
   const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(source);
 
   if (verbose) {
@@ -178,10 +245,11 @@ export async function analyzePackageWithModel(
   if (verbose) {
     const aboveThreshold = triageResults.filter(r => r.score >= MIN_TRIAGE_SCORE);
     console.log(`  [triage:${meta.name}] ${aboveThreshold.length} files above score threshold (${MIN_TRIAGE_SCORE}), sending ${filesToInvestigate.length} to LLM (cap: ${MAX_LLM_FILES})`);
+    logPackageFileScores(meta.name, allContent, triageResults, filesToInvestigate);
   }
 
   if (filesToInvestigate.length === 0) {
-    return { findings: [], needsLlm: false };
+    return { findings: [], needsLlm: false, usage: emptyUsageMetrics('primary_analysis') };
   }
 
   // Phase 2: Per-file LLM analysis
@@ -199,7 +267,9 @@ export async function analyzePackageWithModel(
     filesToInvestigate.map(async (triageEntry, fileIdx) => {
       try {
         const fileContent = allContent.get(triageEntry.filePath);
-        if (!fileContent) return [];
+        if (!fileContent) {
+          return { findings: [] as SupplyChainFinding[], usage: emptyUsageMetrics('primary_analysis') };
+        }
 
         if (verbose) {
           console.log(`  [analyze:${meta.name}] file ${fileIdx + 1}/${filesToInvestigate.length}: ${triageEntry.filePath} (score: ${triageEntry.score}, categories: ${[...triageEntry.categories].join('+')})`);
@@ -212,15 +282,30 @@ export async function analyzePackageWithModel(
           new HumanMessage(filePrompt),
         ];
         const fileFindings: SupplyChainFinding[] = [];
+        let fileUsage = emptyUsageMetrics('primary_analysis');
 
         // Agentic loop for this file — LLM can use grep/read_file for additional context
         for (let round = 0; round < MAX_ROUNDS_PER_FILE; round++) {
-          const response = await invokeWithRetry(
+          if (verbose) {
+            logConversationInput(meta.name, triageEntry.filePath, round + 1, messages);
+          }
+          const { response, usage: roundUsage } = await invokeWithRetry(
             modelWithTools,
             messages,
             `LLM analysis failed for ${meta.name}@${source.version} file ${triageEntry.filePath} during round ${round + 1}`,
-            verbose
+            verbose,
+            getModelName(chatModel)
           );
+          if (verbose) {
+            logConversationOutput(meta.name, triageEntry.filePath, round + 1, response);
+            const roundCostText = roundUsage.costEstimateAvailable
+              ? `$${roundUsage.estimatedCostUsd.toFixed(4)}`
+              : 'unavailable';
+            console.log(
+              `  [analyze:${meta.name}]   usage file ${triageEntry.filePath} round ${round + 1}: ${roundUsage.inputTokens} input, ${roundUsage.outputTokens} output, ${roundUsage.totalTokens} total, estimated cost ${roundCostText}`
+            );
+          }
+          fileUsage = addUsageMetrics(fileUsage, roundUsage);
           messages.push(response);
 
           const toolCalls = response.tool_calls;
@@ -274,22 +359,31 @@ export async function analyzePackageWithModel(
           }
         }
 
-        return fileFindings;
+        if (verbose) {
+          console.log(`  [analyze:${meta.name}] file usage ${triageEntry.filePath}: ${formatUsageSummary(fileUsage)}`);
+        }
+
+        return { findings: fileFindings, usage: fileUsage };
       } catch (error: any) {
         const detail = error?.message ?? String(error);
         console.error(`  ⚠ ${detail}`);
-        return [];
+        return { findings: [] as SupplyChainFinding[], usage: emptyUsageMetrics('primary_analysis') };
       }
     })
   );
 
-  const allFindings = findingsByFile.flat();
+  const allFindings = findingsByFile.flatMap(entry => entry.findings);
+  const usage = findingsByFile.reduce(
+    (acc, entry) => addUsageMetrics(acc, entry.usage),
+    emptyUsageMetrics('primary_analysis')
+  );
 
   if (verbose) {
     console.log(`  [analyze:${meta.name}] complete — ${allFindings.length} findings from ${filesToInvestigate.length} files`);
+    console.log(`  [analyze:${meta.name}] node usage total: ${formatUsageSummary(usage)}`);
   }
 
-  return { findings: allFindings, needsLlm: true };
+  return { findings: allFindings, needsLlm: true, usage };
 }
 
 function normalizeSeverity(s: unknown): SupplyChainFinding['severity'] {
@@ -298,4 +392,13 @@ function normalizeSeverity(s: unknown): SupplyChainFinding['severity'] {
     return str as SupplyChainFinding['severity'];
   }
   return 'MEDIUM';
+}
+
+function getModelName(chatModel: BaseChatModel): string {
+  return (
+    (chatModel as any).model ??
+    (chatModel as any).modelName ??
+    (chatModel as any).model_name ??
+    'unknown'
+  );
 }

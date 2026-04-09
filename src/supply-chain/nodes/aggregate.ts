@@ -1,4 +1,4 @@
-import type { PackageFetchError, SupplyChainFinding, SupplyChainReport, Severity, ThreatCategory } from '../types.js';
+import type { PackageFetchError, SupplyChainFinding, SupplyChainLLMUsage, SupplyChainReport, Severity, ThreatCategory } from '../types.js';
 
 const SEVERITY_ORDER: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 
@@ -9,7 +9,8 @@ export function aggregateNode(
   findings: SupplyChainFinding[],
   packagesAnalyzed: number,
   fetchErrors: PackageFetchError[],
-  model: string
+  model: string,
+  llmUsage: SupplyChainLLMUsage
 ): SupplyChainReport {
   // Deduplicate: same package + same category + same title = duplicate
   const seen = new Set<string>();
@@ -51,6 +52,7 @@ export function aggregateNode(
   return {
     findings: deduped,
     fetchErrors,
+    llmUsage,
     summary: {
       packagesAnalyzed,
       packagesWithFindings,
