@@ -12,6 +12,13 @@ function formatUsageSummary(usage: LLMUsageMetrics): string {
   return `${usage.calls} call(s), ${usage.inputTokens} input, ${usage.outputTokens} output, ${usage.totalTokens} total, estimated cost ${costText}`;
 }
 
+function formatElapsedTime(startTime: number): string {
+  const elapsedMs = Date.now() - startTime;
+  return elapsedMs < 1000
+    ? `${elapsedMs}ms`
+    : `${(elapsedMs / 1000).toFixed(2)}s`;
+}
+
 function responseToText(response: any): string {
   const content = response?.content;
   if (typeof content === 'string') return content;
@@ -36,6 +43,7 @@ export async function deepInvestigationNode(
   concurrency: number = 3,
   verbose: boolean = false
 ): Promise<{ findings: SupplyChainFinding[]; usage: LLMUsageMetrics }> {
+  const nodeStartTime = Date.now();
   const toInvestigate = findings.filter(
     f => (f.severity === 'CRITICAL' || f.severity === 'HIGH') && f.confidence >= 0.3
   );
@@ -50,6 +58,7 @@ export async function deepInvestigationNode(
   const investigated = await pMap(
     toInvestigate,
     async (finding, idx) => {
+      const investigationStartTime = Date.now();
       const key = depKey(finding.ecosystem, finding.packageName);
       const source = sources.get(key);
       if (!source) {
@@ -71,7 +80,7 @@ export async function deepInvestigationNode(
         if (verbose) {
           console.log(`  [deep:${finding.packageName}]   output file ${finding.filePath}:`);
           console.log(responseToText(response));
-          console.log(`  [deep:${finding.packageName}]   usage file ${finding.filePath}: ${formatUsageSummary(usage)}`);
+          console.log(`  [deep:${finding.packageName}]   usage file ${finding.filePath}: ${formatUsageSummary(usage)} | elapsed ${formatElapsedTime(investigationStartTime)}`);
         }
         const parsed = extractJSON(text) as any;
 
@@ -121,15 +130,11 @@ export async function deepInvestigationNode(
     .map(entry => entry.finding)
     .filter((f): f is SupplyChainFinding => f !== null);
   if (confirmed.length === 0 && toInvestigate.length > 0) {
-    if (verbose) {
-      console.log(`  [deep] ZERO confirmed -- node usage total: ${formatUsageSummary(usage)}`);
-    }
+    console.log(`  [deep] ZERO confirmed -- node usage total: ${formatUsageSummary(usage)} | elapsed ${formatElapsedTime(nodeStartTime)}`);
     return { findings, usage };
   }
 
-  if (verbose) {
-    console.log(`  [deep] node usage total: ${formatUsageSummary(usage)}`);
-  }
+  console.log(`  [deep] node usage total: ${formatUsageSummary(usage)} | elapsed ${formatElapsedTime(nodeStartTime)}`);
 
   return { findings: [...confirmed, ...passThrough], usage };
 }

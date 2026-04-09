@@ -82,6 +82,13 @@ function formatUsageSummary(usage: LLMUsageMetrics): string {
   return `${usage.calls} call(s), ${usage.inputTokens} input, ${usage.outputTokens} output, ${usage.totalTokens} total, estimated cost ${costText}`;
 }
 
+function formatElapsedTime(startTime: number): string {
+  const elapsedMs = Date.now() - startTime;
+  return elapsedMs < 1000
+    ? `${elapsedMs}ms`
+    : `${(elapsedMs / 1000).toFixed(2)}s`;
+}
+
 function messageToText(message: any): string {
   const content = message?.content;
   if (typeof content === 'string') return content;
@@ -140,6 +147,7 @@ export async function primaryAnalysisNode(
   verbose: boolean = false,
   onProgress?: (done: number, total: number) => void
 ): Promise<{ findings: SupplyChainFinding[]; usage: LLMUsageMetrics }> {
+  const nodeStartTime = Date.now();
   const findings: SupplyChainFinding[] = [];
 
   const tasks: Array<{ meta: PackageMetadata; source: PackageSource }> = [];
@@ -196,9 +204,7 @@ export async function primaryAnalysisNode(
     }
   }
 
-  if (verbose) {
-    console.log(`  [primary] node usage total: ${formatUsageSummary(usage)}`);
-  }
+  console.log(`  [primary] node usage total: ${formatUsageSummary(usage)} | elapsed ${formatElapsedTime(nodeStartTime)}`);
 
   return { findings, usage };
 }
@@ -235,6 +241,7 @@ export async function analyzePackageWithModel(
   chatModel: BaseChatModel,
   verbose: boolean
 ): Promise<{ findings: SupplyChainFinding[]; needsLlm: boolean; usage: LLMUsageMetrics }> {
+  const packageStartTime = Date.now();
   const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(source);
 
   if (verbose) {
@@ -266,6 +273,7 @@ export async function analyzePackageWithModel(
   const findingsByFile = await Promise.all(
     filesToInvestigate.map(async (triageEntry, fileIdx) => {
       try {
+        const fileStartTime = Date.now();
         const fileContent = allContent.get(triageEntry.filePath);
         if (!fileContent) {
           return { findings: [] as SupplyChainFinding[], usage: emptyUsageMetrics('primary_analysis') };
@@ -286,6 +294,7 @@ export async function analyzePackageWithModel(
 
         // Agentic loop for this file — LLM can use grep/read_file for additional context
         for (let round = 0; round < MAX_ROUNDS_PER_FILE; round++) {
+          const roundStartTime = Date.now();
           if (verbose) {
             logConversationInput(meta.name, triageEntry.filePath, round + 1, messages);
           }
@@ -302,7 +311,7 @@ export async function analyzePackageWithModel(
               ? `$${roundUsage.estimatedCostUsd.toFixed(4)}`
               : 'unavailable';
             console.log(
-              `  [analyze:${meta.name}]   usage file ${triageEntry.filePath} round ${round + 1}: ${roundUsage.inputTokens} input, ${roundUsage.outputTokens} output, ${roundUsage.totalTokens} total, estimated cost ${roundCostText}`
+              `  [analyze:${meta.name}]   usage file ${triageEntry.filePath} round ${round + 1}: ${roundUsage.inputTokens} input, ${roundUsage.outputTokens} output, ${roundUsage.totalTokens} total, estimated cost ${roundCostText}, elapsed ${formatElapsedTime(roundStartTime)}`
             );
           }
           fileUsage = addUsageMetrics(fileUsage, roundUsage);
@@ -360,7 +369,7 @@ export async function analyzePackageWithModel(
         }
 
         if (verbose) {
-          console.log(`  [analyze:${meta.name}] file usage ${triageEntry.filePath}: ${formatUsageSummary(fileUsage)}`);
+          console.log(`  [analyze:${meta.name}] file usage ${triageEntry.filePath}: ${formatUsageSummary(fileUsage)} | elapsed ${formatElapsedTime(fileStartTime)}`);
         }
 
         return { findings: fileFindings, usage: fileUsage };
@@ -379,8 +388,8 @@ export async function analyzePackageWithModel(
   );
 
   if (verbose) {
-    console.log(`  [analyze:${meta.name}] complete — ${allFindings.length} findings from ${filesToInvestigate.length} files`);
-    console.log(`  [analyze:${meta.name}] node usage total: ${formatUsageSummary(usage)}`);
+    console.log(`  [analyze:${meta.name}] complete — ${allFindings.length} findings from ${filesToInvestigate.length} files in ${formatElapsedTime(packageStartTime)}`);
+    console.log(`  [analyze:${meta.name}] node usage total: ${formatUsageSummary(usage)} | elapsed ${formatElapsedTime(packageStartTime)}`);
   }
 
   return { findings: allFindings, needsLlm: true, usage };

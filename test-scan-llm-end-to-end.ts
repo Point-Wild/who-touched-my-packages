@@ -11,6 +11,7 @@ import { Reporter } from './src/ui/reporter.js';
 import type { Dependency } from './src/scanner/types.js';
 
 const llmOptions = parseTestLLMOptions('test-python-final-report.ts');
+const verbose = process.argv.includes('--verbose');
 
 const TARGET = {
   label: 'litellm 1.82.8 final merged report',
@@ -135,7 +136,7 @@ async function buildSupplyChainReportFromTarball() {
       apiKey: llmOptions.apiKey,
       model: llmOptions.model,
       provider: llmOptions.provider,
-      verbose: true,
+      verbose,
       maxPackages: 1,
     });
 
@@ -179,7 +180,7 @@ async function buildStaticReportFromRequirements() {
     html: true,
     json: false,
     quiet: false,
-    verbose: true,
+    verbose,
   };
 
   logStep('Running scanWorkflow on requirements.txt.');
@@ -248,7 +249,7 @@ displayAggregatedReport(finalReport);
 
 logSection('HTML Report');
 logStep('Generating HTML report server.');
-const reporter = new Reporter({ html: true, verbose: true });
+const reporter = new Reporter({ html: true, verbose });
 const server = await reporter.generateHtmlReport(finalReport);
 
 logStep('Opening HTML report in browser.');
