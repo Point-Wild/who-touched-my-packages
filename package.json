@@ -23,6 +23,7 @@
     "test:go": "bun src/index.ts --repo https://github.com/sonatype-nexus-community/intentionally-vulnerable-golang-project",
     "test:ruby": "bun src/index.ts --repo https://github.com/OWASP/railsgoat",
     "test:cli": "bun src/index.ts --repo https://github.com/appsecco/dvna --no-html",
+    "test:ml": "bun tests/ml-scoring-pipeline.test.ts",
     "test:cve:npm": "bun test-known-cve-npm-package.ts",
     "test:cve:python": "bun test-known-cve-python-package.ts",
     "test:cve:go": "bun test-known-cve-go-package.ts",
