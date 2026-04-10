@@ -5,9 +5,9 @@
  * that uses statistical features + triage patterns + package-level signals.
  *
  * Pipeline per package:
- *   1. For each file: extract stat features (115-d) + triage features (64-d)
+ *   1. For each file: extract stat features (115-d) + triage features (68-d)
  *   2. Compute package-level features across all files
- *   3. Build 179-d (or 192-d with pkg) feature vector per file
+ *   3. Build 183-d feature vector per file (trimmed to model's expected dimensions)
  *   4. Run XGBoost → malicious probability per file
  *   5. Return files sorted by probability (highest first)
  */
@@ -35,7 +35,6 @@ export interface ScoredFile {
 export interface PackageScore {
   maxFileProba: number;
   meanFileProba: number;
-  filesAboveThreshold: number;
   scoredFiles: ScoredFile[];
 }
 
@@ -46,8 +45,9 @@ export interface PackageScore {
 export function scorePackage(
   source: PackageSource,
   _meta?: PackageMetadata,
+  existingContent?: Map<string, string>,
 ): PackageScore {
-  const allContent = buildContentMap(source);
+  const allContent = existingContent ?? buildContentMap(source);
 
   // Phase 1: Extract per-file features
   const fileStatFeatures = new Map<string, number[]>();
@@ -85,7 +85,14 @@ export function scorePackage(
         : 0,
     };
 
-    const featureVec = buildFeatureVector(statFeats, triageFeats, filePkgFeatures);
+    let featureVec = buildFeatureVector(statFeats, triageFeats, filePkgFeatures);
+
+    // Trim to model's expected feature count (pkg-level features exceed model dimensions)
+    const { numFeatures } = getModelInfo();
+    if (featureVec.length > numFeatures) {
+      featureVec = featureVec.slice(0, numFeatures);
+    }
+
     const proba = predictMaliciousProba(featureVec);
 
     // Collect matched pattern names for context
@@ -131,12 +138,10 @@ export function scorePackage(
   scoredFiles.sort((a, b) => b.maliciousProba - a.maliciousProba);
 
   const probas = scoredFiles.map(f => f.maliciousProba);
-  const threshold = 0.5;
 
   return {
     maxFileProba: probas.length ? Math.max(...probas) : 0,
     meanFileProba: probas.length ? probas.reduce((a, b) => a + b, 0) / probas.length : 0,
-    filesAboveThreshold: probas.filter(p => p >= threshold).length,
     scoredFiles,
   };
 }

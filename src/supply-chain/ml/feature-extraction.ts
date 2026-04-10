@@ -4,9 +4,9 @@
  *
  * Two feature groups:
  *   1. Statistical features (115-d): entropy, line stats, char ratios, char freqs
- *   2. Triage features (64-d): 60 pattern counts + total_score + n_categories + path_adjust + final_score
+ *   2. Triage features (68-d): 64 pattern counts + total_score + n_categories + path_adjust + final_score
  *
- * Total: 179 features per chunk (no embedding needed).
+ * Total: 183 features per chunk (no embedding needed).
  */
 
 // ── Statistical Features (115) ──────────────────────────────────────────
@@ -235,7 +235,7 @@ const HIGH_VALUE_PATHS = [
 ];
 
 export interface TriageFeatures {
-  counts: number[];          // 60 raw pattern match counts
+  counts: number[];          // 64 raw pattern match counts
   totalScore: number;        // Weighted + combo + multiplier score
   nCategories: number;       // Number of distinct threat categories
   pathAdjust: number;        // Path-based multiplier
@@ -334,8 +334,8 @@ export function computePackageFeatures(
   let hasC2 = 0;
   for (const tr of fileTriageResults.values()) {
     if (tr.nCategories > maxCats) maxCats = tr.nCategories;
-    // install-script is pattern index 49
-    if (tr.counts[49] > 0) hasInstallHook = 1;
+    // install-script is pattern index 48
+    if (tr.counts[48] > 0) hasInstallHook = 1;
     // known-c2 is pattern index 8
     if (tr.counts[8] > 0) hasC2 = 1;
   }
@@ -366,12 +366,12 @@ export function buildFeatureVector(
 ): number[] {
   const vec = [
     ...statFeatures,                          // 115
-    ...triageFeatures.counts,                 // 60
+    ...triageFeatures.counts,                 // 64
     triageFeatures.totalScore,                // 1
     triageFeatures.nCategories,               // 1
     triageFeatures.pathAdjust,                // 1
     triageFeatures.finalScore,                // 1
-  ];                                          // = 179
+  ];                                          // = 183
 
   if (pkgFeatures) {
     vec.push(
@@ -388,7 +388,7 @@ export function buildFeatureVector(
       pkgFeatures.hasInstallHook,
       pkgFeatures.hasKnownC2,
       pkgFeatures.scoreRatio,
-    );                                        // +13 = 192
+    );                                        // +13 = 196
   }
 
   return vec;

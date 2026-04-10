@@ -5,9 +5,7 @@
  * No native dependencies — pure TypeScript.
  */
 
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import modelJson from './model.json' with { type: 'json' };
 
 interface TreeNode {
   nodeid: number;
@@ -63,10 +61,7 @@ let cachedModel: {
 function loadModel(): typeof cachedModel {
   if (cachedModel) return cachedModel;
 
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  const modelPath = join(__dirname, 'model.json');
-  const raw = JSON.parse(readFileSync(modelPath, 'utf-8')) as XGBoostModel;
+  const raw = modelJson as unknown as XGBoostModel;
 
   const gboost = raw.learner.gradient_booster.model;
   const params = raw.learner.learner_model_param;
