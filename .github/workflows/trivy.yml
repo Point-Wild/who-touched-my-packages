@@ -1,0 +1,48 @@
+name: Trivy scan
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  push:
+
+jobs:
+  trivy-repo-scan:
+    if: github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    name: Trivy repo scan
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2,docker.io/aquasec/trivy-db:2
+      TRIVY_JAVA_DB_REPOSTITORY: ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1,docker.io/aquasec/trivy-java-db:1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run Trivy Repo scan with output into JSON format
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'json'
+          hide-progress: true
+          output: 'trivy-repo-results.json'
+
+      - name: Convert Trivy Repo scan results into SARIF format
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: 'convert'
+          vuln-type: ""
+          image-ref: 'trivy-repo-results.json'
+          format: 'sarif'
+          output: 'trivy-repo-results.sarif'
+          skip-setup-trivy: true
+        env:
+          TRIVY_FORMAT: sarif
+
+      - name: Upload Trivy Repo scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-repo-results.sarif'
