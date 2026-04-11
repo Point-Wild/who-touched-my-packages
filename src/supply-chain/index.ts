@@ -4,6 +4,7 @@ import { createChatModel } from './llm/client.js';
 import { DEFAULT_MODEL, DEFAULT_CONCURRENCY, resolveModel } from './llm/models.js';
 import type { SupplyChainOptions, SupplyChainReport } from './types.js';
 import { resolveApiKey } from './utils.js';
+import { createEmptyLLMUsage } from './usage.js';
 
 export type { SupplyChainFinding, SupplyChainOptions, SupplyChainReport, ThreatCategory } from './types.js';
 export { DEFAULT_MODEL, DEFAULT_CONCURRENCY } from './llm/models.js';
@@ -26,6 +27,7 @@ export async function analyzeSupplyChain(
     return {
       findings: [],
       fetchErrors: [],
+      llmUsage: createEmptyLLMUsage(),
       summary: {
         packagesAnalyzed: dependencies.length,
         packagesWithFindings: 0,
@@ -63,12 +65,14 @@ export async function analyzeSupplyChain(
     fetchErrors: [],
     primaryFindings: [],
     allFindings: [],
+    llmUsage: createEmptyLLMUsage(),
     result: null,
   });
 
   return finalState.result ?? {
     findings: [],
     fetchErrors: [],
+    llmUsage: createEmptyLLMUsage(),
     summary: {
       packagesAnalyzed: 0,
       packagesWithFindings: 0,

@@ -241,6 +241,26 @@ async function main() {
             console.log(theme.dim(`  ... and ${supplyChainReport.fetchErrors.length - 5} more`));
           }
         }
+
+        if (options.verbose && !options.json && !options.quiet) {
+          const { llmUsage } = supplyChainReport;
+          console.log(theme.bold('\nLLM Usage:'));
+          for (const [nodeName, usage] of Object.entries(llmUsage.byNode)) {
+            const costText = usage.costEstimateAvailable
+              ? `$${usage.estimatedCostUsd.toFixed(4)}`
+              : 'unavailable';
+            console.log(theme.dim(
+              `  • ${nodeName}: ${usage.calls} call(s), ${usage.inputTokens} input, ${usage.outputTokens} output, ${usage.totalTokens} total, estimated cost ${costText}`
+            ));
+          }
+
+          const totalCostText = llmUsage.total.costEstimateAvailable
+            ? `$${llmUsage.total.estimatedCostUsd.toFixed(4)}`
+            : 'unavailable';
+          console.log(theme.dim(
+            `  Total: ${llmUsage.total.calls} call(s), ${llmUsage.total.inputTokens} input, ${llmUsage.total.outputTokens} output, ${llmUsage.total.totalTokens} total, estimated cost ${totalCostText}`
+          ));
+        }
       } catch (error: any) {
         if (spinner) {
           spinner.fail(`Supply chain analysis failed: ${error.message}`);
