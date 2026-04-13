@@ -10,11 +10,11 @@ const suites = {
     ['npm', 'run', 'test:cve:ruby'],
   ],
   llm: [
-    ['bun', 'test-llm-npm-package.ts'],
-    ['bun', 'test-llm-python-package.ts'],
-    ['bun', 'test-llm-go-package.ts'],
-    ['bun', 'test-llm-rust-package.ts'],
-    ['bun', 'test-llm-ruby-package.ts'],
+    ['bun', 'tests/llm-npm-package.test.ts'],
+    ['bun', 'tests/llm-python-package.test.ts'],
+    ['bun', 'tests/llm-go-package.test.ts'],
+    ['bun', 'tests/llm-rust-package.test.ts'],
+    ['bun', 'tests/llm-ruby-package.test.ts'],
   ],
 };
 

@@ -6,11 +6,11 @@
  */
 
 import assert from 'node:assert/strict';
-import { parseTestLLMOptions } from './test-llm-options.js';
-import { formatTriageResults } from './src/supply-chain/llm/tools.js';
-import { createChatModel } from './src/supply-chain/llm/client.js';
-import { analyzePackageWithModel, planPackageInvestigation } from './src/supply-chain/nodes/primary-analysis.js';
-import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
+import { parseTestLLMOptions } from './helpers/llm-options.js';
+import { formatTriageResults } from '../src/supply-chain/llm/tools.js';
+import { createChatModel } from '../src/supply-chain/llm/client.js';
+import { analyzePackageWithModel, planPackageInvestigation } from '../src/supply-chain/nodes/primary-analysis.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../src/supply-chain/types.js';
 
 const TARGETS = [
   {
@@ -63,7 +63,7 @@ https.get(url, (res) => {
   },
 ];
 
-const llmOptions = parseTestLLMOptions('test-llm-npm-package.ts');
+const llmOptions = parseTestLLMOptions('llm-npm-package.test.ts');
 
 function buildFakeMetadata(version: string): PackageMetadata {
   const signals: RegistrySignals = {

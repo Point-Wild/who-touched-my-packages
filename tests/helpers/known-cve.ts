@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { OSVDataSource } from './src/auditor/datasources/index.js';
-import { VulnerabilityChecker } from './src/auditor/vulnerability-checker.js';
-import type { Vulnerability } from './src/auditor/types.js';
-import type { Dependency } from './src/scanner/types.js';
+import { OSVDataSource } from '../../src/auditor/datasources/index.js';
+import { VulnerabilityChecker } from '../../src/auditor/vulnerability-checker.js';
+import type { Vulnerability } from '../../src/auditor/types.js';
+import type { Dependency } from '../../src/scanner/types.js';
 
 export interface KnownCveCase {
   label: string;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { resolveApiKey } from './src/supply-chain/utils.js';
-import { resolveModel } from './src/supply-chain/llm/models.js';
-import type { LLMProvider } from './src/supply-chain/llm/models.js';
+import { resolveApiKey } from '../../src/supply-chain/utils.js';
+import { resolveModel } from '../../src/supply-chain/llm/models.js';
+import type { LLMProvider } from '../../src/supply-chain/llm/models.js';
 
 interface TestLLMOptions {
   provider?: LLMProvider;

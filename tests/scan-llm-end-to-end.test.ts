@@ -3,14 +3,14 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import open from 'open';
-import { parseTestLLMOptions } from './test-llm-options.js';
-import { scanWorkflow, type ScanWorkflowOptions } from './src/scan-workflow.js';
-import { buildFinalReport, displayAggregatedReport } from './src/ui/aggregated-report.js';
-import { analyzeSupplyChain } from './src/supply-chain/index.js';
-import { Reporter } from './src/ui/reporter.js';
-import type { Dependency } from './src/scanner/types.js';
+import { parseTestLLMOptions } from './helpers/llm-options.js';
+import { scanWorkflow, type ScanWorkflowOptions } from '../src/scan-workflow.js';
+import { buildFinalReport, displayAggregatedReport } from '../src/ui/aggregated-report.js';
+import { analyzeSupplyChain } from '../src/supply-chain/index.js';
+import { Reporter } from '../src/ui/reporter.js';
+import type { Dependency } from '../src/scanner/types.js';
 
-const llmOptions = parseTestLLMOptions('test-python-final-report.ts');
+const llmOptions = parseTestLLMOptions('scan-llm-end-to-end.test.ts');
 
 const TARGET = {
   label: 'litellm 1.82.8 final merged report',

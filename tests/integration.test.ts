@@ -3,7 +3,7 @@
  * REAL npm/PyPI registry data and REAL package tarballs.
  *
  * No LLM calls. Requires internet access.
- * Run with:  bun test-integration.ts
+ * Run with:  bun tests/integration.test.ts
  *
  * What this validates end-to-end (beyond the unit tests):
  *   Phase 1 — fetchNpmMetadata() correctly populates registrySignals from live API
@@ -12,11 +12,11 @@
  *   Phase 3 — legitimate files stay below MIN_TRIAGE_SCORE (false-positive guard on real code)
  */
 
-import { fetchNpmMetadata, fetchNpmSource } from './src/supply-chain/registry/npm.js';
-import { fetchPypiMetadata } from './src/supply-chain/registry/pypi.js';
-import { fetchCratesMetadata, fetchCratesSource } from './src/supply-chain/registry/crates.js';
-import { fetchGoMetadata, fetchGoSource } from './src/supply-chain/registry/golang.js';
-import { runTriage, buildContentMap } from './src/supply-chain/llm/tools.js';
+import { fetchNpmMetadata, fetchNpmSource } from '../src/supply-chain/registry/npm.js';
+import { fetchPypiMetadata } from '../src/supply-chain/registry/pypi.js';
+import { fetchCratesMetadata, fetchCratesSource } from '../src/supply-chain/registry/crates.js';
+import { fetchGoMetadata, fetchGoSource } from '../src/supply-chain/registry/golang.js';
+import { runTriage, buildContentMap } from '../src/supply-chain/llm/tools.js';
 
 const MIN_TRIAGE_SCORE = 8;
 const TIMEOUT_MS = 30_000;

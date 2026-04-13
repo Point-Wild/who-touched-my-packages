@@ -328,7 +328,7 @@ OPENROUTER_API_KEY=... npm run test:llm:rust --llm-provider openrouter --supply-
 ### Run specialized test harnesses
 
 ```bash
-npm run test:malware:litellm
+npm run test:e2e:scan-llm
 npm run test:integration
 ```
 

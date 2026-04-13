@@ -1,6 +1,6 @@
 /**
  * Intent-validation tests for Phase 1–3 supply chain detection changes.
- * Run with:  bun test-changes.ts
+ * Run with:  bun tests/changes.test.ts
  *
  * Tests verify that the new detection logic correctly identifies the ACTUAL
  * attack patterns it was designed to catch, using realistic malicious code
@@ -14,10 +14,10 @@ import {
   computeTyposquatCandidate,
   isDependencyConfusion,
   computeRegistryRiskScore,
-} from './src/supply-chain/registry/signals.js';
-import { runTriage, type TriageResult } from './src/supply-chain/llm/tools.js';
-import { buildInvestigationKickoff, buildFileAnalysisPrompt } from './src/supply-chain/llm/prompts.js';
-import type { PackageMetadata, PackageSource, RegistrySignals } from './src/supply-chain/types.js';
+} from '../src/supply-chain/registry/signals.js';
+import { runTriage, type TriageResult } from '../src/supply-chain/llm/tools.js';
+import { buildInvestigationKickoff, buildFileAnalysisPrompt } from '../src/supply-chain/llm/prompts.js';
+import type { PackageMetadata, PackageSource, RegistrySignals } from '../src/supply-chain/types.js';
 
 // ── Threshold — must match primary-analysis.ts ───────────────────────────────
 const MIN_TRIAGE_SCORE = 8;
@@ -474,4 +474,3 @@ assert(
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n── Results: ${passed} passed, ${failed} failed ──\n`);
 if (failed > 0) process.exit(1);
-
