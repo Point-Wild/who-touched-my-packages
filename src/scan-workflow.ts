@@ -1,5 +1,6 @@
 import { applyVerificationResults, verifyPackages } from './auditor/package-verifier.js';
 import { OSVDataSource } from './auditor/datasources/index.js';
+import { applyPackageAges, fetchPackageAges } from './auditor/package-age.js';
 import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
 import { parseDependencies } from './scanner/dependency-parser.js';
 import { buildDependencyTree, flattenDependencyTree } from './scanner/dependency-tree-resolver.js';
@@ -251,8 +252,26 @@ export async function scanWorkflow(
     new OSVDataSource(),
   ]);
 
+  if (spinner) {
+    spinner.text = 'Verifying from OSV...';
+  }
+
   const auditResult = await checker.checkDependencies(allDependencies);
   logVerbose(`Vulnerability results: ${auditResult.vulnerabilities.length} findings across ${auditResult.scannedPackages} scanned packages`);
+
+  if (auditResult.vulnerabilities.length > 0) {
+    if (spinner) {
+      spinner.text = 'Fetching package release dates...';
+    }
+    try {
+      const ages = await fetchPackageAges(auditResult.vulnerabilities);
+      applyPackageAges(auditResult.vulnerabilities, ages);
+      logVerbose(`Package ages resolved for ${ages.size} unique package versions`);
+    } catch (error) {
+      logVerbose(`Failed to fetch package ages: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   if (auditResult.vulnerabilities.length > 0) {
     logVerboseJson(
       'Vulnerabilities',

@@ -7,10 +7,6 @@ import open from 'open';
 import ora from 'ora';
 
 import * as Package from "../package.json" assert { type: "json" };
-import { OSVDataSource } from './auditor/datasources/index.js';
-import { applyVerificationResults, verifyPackages } from './auditor/package-verifier.js';
-import { VulnerabilityChecker } from './auditor/vulnerability-checker.js';
-import type { Dependency } from './scanner/types.js';
 import { scanWorkflow, type ScanWorkflowOptions } from './scan-workflow.js';
 import { analyzeSupplyChain, DEFAULT_CONCURRENCY, DEFAULT_MODEL, type SupplyChainReport } from './supply-chain/index.js';
 import { buildFinalReport, displayAggregatedReport } from './ui/aggregated-report.js';

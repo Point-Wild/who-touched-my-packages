@@ -15,6 +15,8 @@ export interface Vulnerability {
   fixedVersions?: string;
   publishedDate?: string;
   source: string;
+  packagePublishedAt?: string;
+  packageAgeDays?: number;
 }
 
 export interface AuditResult {

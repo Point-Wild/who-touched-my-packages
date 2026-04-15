@@ -1,3 +1,7 @@
+import {
+  getCachedCratesDoc,
+  setCachedCratesDoc,
+} from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
@@ -10,10 +14,13 @@ import {
 const CRATES_BASE = 'https://crates.io/api/v1/crates';
 
 export async function fetchCratesMetadata(packageName: string): Promise<PackageMetadata | null> {
-  const res = await fetch(`${CRATES_BASE}/${encodeURIComponent(packageName)}`);
-  if (!res.ok) throw createRegistryFetchError('crates.io', packageName, res.status);
-
-  const data = await res.json() as any;
+  let data: any = getCachedCratesDoc(packageName);
+  if (!data) {
+    const res = await fetch(`${CRATES_BASE}/${encodeURIComponent(packageName)}`);
+    if (!res.ok) throw createRegistryFetchError('crates.io', packageName, res.status);
+    data = await res.json() as any;
+    setCachedCratesDoc(packageName, data);
+  }
   const crate = data.crate ?? {};
   const versions = Array.isArray(data.versions) ? data.versions : [];
   const newestVersion = versions.find((v: any) => v.num === crate.newest_version) ?? versions[0] ?? {};

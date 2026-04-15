@@ -2,8 +2,15 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-const REGISTRY_CACHE = new Map<string, any>();
-const PYPI_REGISTRY_CACHE = new Map<string, any>();
+import {
+  NPM_REGISTRY_CACHE,
+  PYPI_REGISTRY_CACHE,
+  CRATES_REGISTRY_CACHE,
+  GO_PROXY_CACHE,
+  RUBYGEMS_CACHE,
+} from './registry-cache.js';
+
+const REGISTRY_CACHE = NPM_REGISTRY_CACHE;
 
 async function fetchPackageFromRegistry(name: string, versionSpec: string): Promise<any | null> {
   const cacheKey = `${name}@${versionSpec}`;
@@ -107,10 +114,6 @@ export interface DependencyTree {
 
 const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
-
-const CRATES_REGISTRY_CACHE = new Map<string, any>();
-const GO_PROXY_CACHE = new Map<string, any>();
-const RUBYGEMS_CACHE = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
