@@ -8,6 +8,8 @@ export interface Vulnerability {
   references: string[];
   cvss?: number;
   source: string;
+  packagePublishedAt?: string;
+  packageAgeDays?: number;
 }
 
 export interface AuditSummary {

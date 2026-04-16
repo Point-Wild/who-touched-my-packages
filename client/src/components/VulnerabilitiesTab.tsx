@@ -16,6 +16,17 @@ interface TabFinding {
   cvss?: number;
   source: string;
   files: string[];
+  packagePublishedAt?: string;
+  packageAgeDays?: number;
+}
+
+function formatPackageAge(days?: number): string {
+  if (days == null || !Number.isFinite(days) || days < 0) return 'N/A';
+  if (days < 1) return 'today';
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 30)}mo`;
+  const years = days / 365;
+  return years < 10 ? `${years.toFixed(1)}y` : `${Math.floor(years)}y`;
 }
 
 export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
@@ -78,6 +89,8 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
     { key: 'title' as const, label: 'Title' },
     { key: 'cvss' as const, label: 'CVSS' },
     { key: 'files' as const, label: 'File' },
+    { key: 'packageAgeDays' as const, label: 'Package Age (days)' },
+    { key: 'packagePublishedAt' as const, label: 'Package Published' },
     { key: 'references' as const, label: 'References' },
   ];
 
@@ -137,6 +150,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                 <th>Title & References</th>
                 <th>CVSS</th>
                 <th>File</th>
+                <th>Package Age</th>
               </tr>
             </thead>
             <tbody>
@@ -221,6 +235,18 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                         }}
                       >
                         {vuln.files.join(', ')}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                    )}
+                  </td>
+                  <td>
+                    {vuln.packageAgeDays != null ? (
+                      <span
+                        title={vuln.packagePublishedAt ? `Published ${vuln.packagePublishedAt}` : undefined}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        {formatPackageAge(vuln.packageAgeDays)}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--text-muted)' }}>N/A</span>
