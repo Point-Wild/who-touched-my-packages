@@ -1,7 +1,3 @@
-import {
-  getCachedPypiRelease,
-  setCachedPypiRelease,
-} from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
@@ -19,10 +15,6 @@ export async function fetchPypiMetadata(packageName: string): Promise<PackageMet
   if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status);
 
   const data = await res.json() as any;
-  // Populate shared cache so later fetches for this release can skip the network.
-  if (data?.info?.version) {
-    setCachedPypiRelease(packageName, data.info.version, data);
-  }
   const info = data.info ?? {};
   const releases = data.releases ?? {};
   const versions = Object.keys(releases);
@@ -111,13 +103,10 @@ export async function fetchPypiSource(
   packageName: string,
   version: string
 ): Promise<PackageSource | null> {
-  let data: any = getCachedPypiRelease(packageName, version);
-  if (!data) {
-    const res = await fetch(`${PYPI_BASE}/${packageName}/${version}/json`);
-    if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status, version);
-    data = await res.json() as any;
-    setCachedPypiRelease(packageName, version, data);
-  }
+  const res = await fetch(`${PYPI_BASE}/${packageName}/${version}/json`);
+  if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status, version);
+
+  const data = await res.json() as any;
   const releases = data.urls ?? [];
 
   // Prefer sdist (.tar.gz) for source inspection

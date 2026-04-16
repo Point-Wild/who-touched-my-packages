@@ -1,7 +1,3 @@
-import {
-  getCachedNpmVersionManifest,
-  setCachedNpmVersionManifest,
-} from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
@@ -121,14 +117,10 @@ export async function fetchNpmSource(
   previousVersion?: string
 ): Promise<PackageSource | null> {
   const encoded = encodeURIComponent(packageName);
+  const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
+  if (!metaRes.ok) throw createRegistryFetchError('npm', packageName, metaRes.status, version);
 
-  let meta = getCachedNpmVersionManifest(packageName, version);
-  if (!meta) {
-    const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
-    if (!metaRes.ok) throw createRegistryFetchError('npm', packageName, metaRes.status, version);
-    meta = await metaRes.json() as any;
-    setCachedNpmVersionManifest(packageName, version, meta);
-  }
+  const meta = await metaRes.json() as any;
   const tarballUrl = meta.dist?.tarball;
   if (!tarballUrl) {
     throw new Error(`npm package ${packageName}@${version} does not expose a tarball URL`);
@@ -191,15 +183,9 @@ export async function fetchNpmSource(
   let newFilesInVersion: string[] | undefined;
   if (previousVersion) {
     try {
-      let prevMeta: any = getCachedNpmVersionManifest(packageName, previousVersion);
-      if (!prevMeta) {
-        const prevVersionRes = await fetch(`${REGISTRY_BASE}/${encodeURIComponent(packageName)}/${previousVersion}`);
-        if (prevVersionRes.ok) {
-          prevMeta = await prevVersionRes.json() as any;
-          setCachedNpmVersionManifest(packageName, previousVersion, prevMeta);
-        }
-      }
-      if (prevMeta) {
+      const prevVersionRes = await fetch(`${REGISTRY_BASE}/${encodeURIComponent(packageName)}/${previousVersion}`);
+      if (prevVersionRes.ok) {
+        const prevMeta = await prevVersionRes.json() as any;
         const prevTarball = prevMeta.dist?.tarball;
         if (prevTarball) {
           const prevTarRes = await fetch(prevTarball);
