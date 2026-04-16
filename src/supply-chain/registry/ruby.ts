@@ -1,3 +1,4 @@
+import { registryFetchJson, registryFetchRaw } from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractGem } from './tarball.js';
@@ -10,14 +11,12 @@ import {
 const RUBYGEMS_BASE = 'https://rubygems.org/api/v1';
 
 export async function fetchRubyMetadata(packageName: string): Promise<PackageMetadata | null> {
-  const [gemRes, versionsRes] = await Promise.all([
-    fetch(`${RUBYGEMS_BASE}/gems/${encodeURIComponent(packageName)}.json`),
-    fetch(`${RUBYGEMS_BASE}/versions/${encodeURIComponent(packageName)}.json`).catch(() => null),
+  const [gem, versionsResult] = await Promise.all([
+    registryFetchJson(`${RUBYGEMS_BASE}/gems/${encodeURIComponent(packageName)}.json`) as Promise<any>,
+    registryFetchRaw(`${RUBYGEMS_BASE}/versions/${encodeURIComponent(packageName)}.json`).catch(() => null),
   ]);
 
-  if (!gemRes.ok) throw createRegistryFetchError('RubyGems', packageName, gemRes.status);
-  const gem = await gemRes.json() as any;
-  const versions = versionsRes?.ok ? await versionsRes.json() as any[] : [];
+  const versions: any[] = versionsResult?.ok ? versionsResult.data : [];
 
   const latestVersion = gem.version ?? '';
   const previousVersion = versions
@@ -73,8 +72,8 @@ export async function fetchRubySource(
   packageName: string,
   version: string
 ): Promise<PackageSource | null> {
-  const versionRes = await fetch(`${RUBYGEMS_BASE}/versions/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}.json`);
-  const versionMeta = versionRes.ok ? await versionRes.json() as any : null;
+  const versionResult = await registryFetchRaw(`${RUBYGEMS_BASE}/versions/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}.json`);
+  const versionMeta = versionResult.ok ? versionResult.data : null;
   const gemUrl = versionMeta?.gem_uri ?? `https://rubygems.org/downloads/${encodeURIComponent(packageName)}-${encodeURIComponent(version)}.gem`;
   const gemRes = await fetch(gemUrl);
   if (!gemRes.ok) throw createRegistryFetchError('RubyGems', packageName, gemRes.status, version);

@@ -21,7 +21,7 @@ interface TabFinding {
 }
 
 function formatPackageAge(days?: number): string {
-  if (days == null || !Number.isFinite(days) || days < 0) return 'N/A';
+  if (days == null || !Number.isFinite(days) || days < 0) return 'Unknown';
   if (days < 1) return 'today';
   if (days < 30) return `${days}d`;
   if (days < 365) return `${Math.floor(days / 30)}mo`;
@@ -249,7 +249,7 @@ export function VulnerabilitiesTab({ data }: VulnerabilitiesTabProps) {
                         {formatPackageAge(vuln.packageAgeDays)}
                       </span>
                     ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                      <span style={{ color: 'var(--text-muted)' }}>Unknown</span>
                     )}
                   </td>
                 </tr>

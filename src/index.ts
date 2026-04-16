@@ -14,6 +14,7 @@ import { Reporter } from './ui/reporter.js';
 import { icons, recreateTheme, setColorEnabled, theme } from './ui/theme.js';
 import { shouldFailOnSeverity } from './utils/config.js';
 import { cloneRepository } from './utils/git-clone.js';
+import { setCacheEnabled } from './scanner/registry-cache.js';
 import { Logger } from './utils/logger.js';
 
 const program = new Command();
@@ -30,9 +31,10 @@ interface CLIOptions extends ScanWorkflowOptions {
   gitCloneDepth: string;
   supplyChainModel?: string;
   llmProvider?: 'anthropic' | 'openai' | 'gemini' | 'openrouter';
-  supplyChainConcurrency: string;
+  concurrency: string;
   supplyChainMaxPackages: string;
   supplyChainDryRun: boolean;
+  cache: boolean;
 }
 
 program
@@ -59,10 +61,12 @@ program
   .option('--supply-chain', 'Enable supply chain security analysis', false)
   .option('--supply-chain-model <model>', `LLM model for supply chain analysis (default: per-provider, e.g. ${DEFAULT_MODEL})`)
   .option('--llm-provider <provider>', 'LLM provider — auto-detected from model name when omitted (anthropic, openai, gemini, openrouter)')
-  .option('--supply-chain-concurrency <number>', 'Number of concurrent LLM requests', String(DEFAULT_CONCURRENCY))
+  .option('--concurrency <number>', 'Number of concurrent network/LLM requests', String(DEFAULT_CONCURRENCY))
   .option('--package-depth <number>', 'Maximum dependency package depth to include in graph/supply-chain input (1 = direct only)', '1')
   .option('--supply-chain-max-packages <number>', 'Maximum packages to analyse in supply chain scan (0 = unlimited)', '0')
   .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
+  .option('--cache', 'Enable registry response caching (default: true)', true)
+  .option('--no-cache', 'Disable registry response caching')
   .parse();
 
 const options = program.opts() as CLIOptions;
@@ -121,6 +125,9 @@ function restoreTerminalInput(): void {
 }
 
 async function main() {
+  if (!options.cache) {
+    setCacheEnabled(false);
+  }
   const logger = new Logger(options.verbose);
   
   let scanPath: string;
@@ -211,7 +218,7 @@ async function main() {
         supplyChainReport = await analyzeSupplyChain(supplyChainDependencies, {
           model: options.supplyChainModel,
           provider: options.llmProvider,
-          concurrency: parseInt(options.supplyChainConcurrency, 10),
+          concurrency: parseInt(options.concurrency, 10),
           verbose: options.verbose,
           maxPackages: parseInt(options.supplyChainMaxPackages ?? '0', 10),
           dryRun: options.supplyChainDryRun,

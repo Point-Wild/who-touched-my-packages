@@ -1,3 +1,4 @@
+import { getCachedPublishedAt, registryFetchRaw } from '../scanner/registry-cache.js';
 import type { Dependency } from '../scanner/types.js';
 import type { Vulnerability } from './types.js';
 
@@ -24,15 +25,17 @@ async function fetchVersionPublishedAt(
   try {
     switch (ecosystem) {
       case 'npm': {
-        const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`);
-        if (!res.ok) return null;
-        const meta = await res.json() as { time?: Record<string, string> };
+        const url = `https://registry.npmjs.org/${encodeURIComponent(name)}`;
+        const result = await registryFetchRaw(url);
+        if (!result.ok) return null;
+        const meta = result.data as { time?: Record<string, string> };
         return meta.time?.[version] ?? null;
       }
       case 'pypi': {
-        const res = await fetch(`https://pypi.org/pypi/${encodeURIComponent(name)}/${encodeURIComponent(version)}/json`);
-        if (!res.ok) return null;
-        const data = await res.json() as { urls?: Array<{ upload_time_iso_8601?: string; upload_time?: string }> };
+        const url = `https://pypi.org/pypi/${encodeURIComponent(name)}/${encodeURIComponent(version)}/json`;
+        const result = await registryFetchRaw(url);
+        if (!result.ok) return null;
+        const data = result.data as { urls?: Array<{ upload_time_iso_8601?: string; upload_time?: string }> };
         let earliest: string | null = null;
         for (const file of data.urls ?? []) {
           const t = file.upload_time_iso_8601 ?? file.upload_time;
@@ -41,21 +44,24 @@ async function fetchVersionPublishedAt(
         return earliest;
       }
       case 'cargo': {
-        const res = await fetch(`https://crates.io/api/v1/crates/${encodeURIComponent(name)}/${encodeURIComponent(version)}`);
-        if (!res.ok) return null;
-        const data = await res.json() as { version?: { created_at?: string } };
+        const url = `https://crates.io/api/v1/crates/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+        const result = await registryFetchRaw(url);
+        if (!result.ok) return null;
+        const data = result.data as { version?: { created_at?: string } };
         return data.version?.created_at ?? null;
       }
       case 'go': {
-        const res = await fetch(`https://proxy.golang.org/${escapeGoModulePath(name)}/@v/${encodeURIComponent(version)}.info`);
-        if (!res.ok) return null;
-        const data = await res.json() as { Time?: string };
+        const url = `https://proxy.golang.org/${escapeGoModulePath(name)}/@v/${encodeURIComponent(version)}.info`;
+        const result = await registryFetchRaw(url);
+        if (!result.ok) return null;
+        const data = result.data as { Time?: string };
         return data.Time ?? null;
       }
       case 'ruby': {
-        const res = await fetch(`https://rubygems.org/api/v1/versions/${encodeURIComponent(name)}.json`);
-        if (!res.ok) return null;
-        const versions = await res.json() as Array<{ number?: string; created_at?: string; built_at?: string }>;
+        const url = `https://rubygems.org/api/v1/versions/${encodeURIComponent(name)}.json`;
+        const result = await registryFetchRaw(url);
+        if (!result.ok) return null;
+        const versions = result.data as Array<{ number?: string; created_at?: string; built_at?: string }>;
         const match = versions.find(v => String(v.number) === version);
         return match?.created_at ?? match?.built_at ?? null;
       }

@@ -1,3 +1,7 @@
+import {
+  registryFetchJson,
+  registryFetchRaw,
+} from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
@@ -11,10 +15,7 @@ const PYPI_BASE = 'https://pypi.org/pypi';
 const STATS_BASE = 'https://pypistats.org/api/packages';
 
 export async function fetchPypiMetadata(packageName: string): Promise<PackageMetadata | null> {
-  const res = await fetch(`${PYPI_BASE}/${packageName}/json`);
-  if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status);
-
-  const data = await res.json() as any;
+  const data = await registryFetchJson(`${PYPI_BASE}/${packageName}/json`) as any;
   const info = data.info ?? {};
   const releases = data.releases ?? {};
   const versions = Object.keys(releases);
@@ -33,10 +34,9 @@ export async function fetchPypiMetadata(packageName: string): Promise<PackageMet
 
   let weeklyDownloads = 0;
   try {
-    const statsRes = await fetch(`${STATS_BASE}/${packageName}/recent`);
-    if (statsRes.ok) {
-      const stats = await statsRes.json() as any;
-      weeklyDownloads = stats.data?.last_week ?? 0;
+    const statsResult = await registryFetchRaw(`${STATS_BASE}/${packageName}/recent`);
+    if (statsResult.ok) {
+      weeklyDownloads = statsResult.data?.data?.last_week ?? 0;
     }
   } catch {
     // Stats service may be unavailable
@@ -103,10 +103,7 @@ export async function fetchPypiSource(
   packageName: string,
   version: string
 ): Promise<PackageSource | null> {
-  const res = await fetch(`${PYPI_BASE}/${packageName}/${version}/json`);
-  if (!res.ok) throw createRegistryFetchError('PyPI', packageName, res.status, version);
-
-  const data = await res.json() as any;
+  const data = await registryFetchJson(`${PYPI_BASE}/${packageName}/${version}/json`) as any;
   const releases = data.urls ?? [];
 
   // Prefer sdist (.tar.gz) for source inspection

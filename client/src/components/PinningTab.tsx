@@ -21,8 +21,6 @@ export function PinningTab({}: PinningTabProps) {
           <li><strong>Dependency Review:</strong> Regularly review dependencies for security vulnerabilities and update them promptly</li>
           <li><strong>Vetted Dependencies:</strong> Only use dependencies from trusted sources and maintain a vetted list of approved packages</li>
           <li><strong>Never implicitly trust:</strong> Never fully trust your dependency providers</li>
-          <li><strong>Use a Firewall:</strong> Use a firewall tool such as <a href="https://socket.dev" target="_blank" rel="noopener">socket.dev</a> to block malicious packages</li>
-          <li><strong>Use a trusted registry:</strong> Use a trusted registry such as <a href="https://jfrog.com/artifactory/" target="_blank" rel="noopener">JFrog Artifactory</a> to block malicious packages</li>
         </ul>
         <p>
           While it may seem like the clear solution, dependency pinning <strong>still leaves you vulnerable</strong> to supply chain attacks if your dependency providers are compromised. Pinning dependencies only impacts the top level of your dependency tree, not the transitive dependencies of those dependencies. 

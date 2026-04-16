@@ -1,3 +1,4 @@
+import { registryFetchRaw } from '../scanner/registry-cache.js';
 import type { Dependency } from '../scanner/types.js';
 
 // Enable debug logging
@@ -23,10 +24,13 @@ export interface VerificationResult {
  * For NPM: Checks npm registry for provenance attestation
  * For Python: Checks PyPI for attestations (PEP 740)
  */
-export async function verifyPackages(dependencies: Dependency[]): Promise<VerificationResult[]> {
-  const results: VerificationResult[] = [];
+export async function verifyPackages(
+  dependencies: Dependency[],
+  concurrency: number = 8,
+): Promise<VerificationResult[]> {
+  const effective_concurrency = Math.max(1, concurrency ?? 8);
 
-  log(`Verifying ${dependencies.length} packages...`);
+  log(`Verifying ${dependencies.length} packages (concurrency=${effective_concurrency})...`);
 
   // Group by ecosystem for efficient batch processing
   const npmDeps = dependencies.filter(d => d.ecosystem === 'npm');
@@ -34,41 +38,62 @@ export async function verifyPackages(dependencies: Dependency[]): Promise<Verifi
 
   log(`NPM: ${npmDeps.length}, Python: ${pythonDeps.length}`);
 
-  // Process NPM packages
-  for (const dep of npmDeps) {
-    try {
-      const result = await verifyNpmPackage(dep.name, dep.version);
-      log(`NPM ${dep.name}@${dep.version}: hasProvenance=${result.hasProvenance}`, result.error || '');
-      results.push(result);
-    } catch (error) {
-      log(`NPM ${dep.name}@${dep.version}: ERROR`, error);
-      results.push({
-        packageName: dep.name,
-        version: dep.version,
-        ecosystem: 'npm',
-        hasProvenance: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
+  const tasks: Array<() => Promise<VerificationResult>> = [
+    ...npmDeps.map(dep => async () => {
+      try {
+        const result = await verifyNpmPackage(dep.name, dep.version);
+        log(`NPM ${dep.name}@${dep.version}: hasProvenance=${result.hasProvenance}`, result.error || '');
+        return result;
+      } catch (error) {
+        log(`NPM ${dep.name}@${dep.version}: ERROR`, error);
+        return {
+          packageName: dep.name,
+          version: dep.version,
+          ecosystem: 'npm' as const,
+          hasProvenance: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }),
+    ...pythonDeps.map(dep => async () => {
+      try {
+        const result = await verifyPythonPackage(dep.name, dep.version);
+        log(`PyPI ${dep.name}@${dep.version}: hasProvenance=${result.hasProvenance}`, result.error || '');
+        return result;
+      } catch (error) {
+        log(`PyPI ${dep.name}@${dep.version}: ERROR`, error);
+        return {
+          packageName: dep.name,
+          version: dep.version,
+          ecosystem: 'pypi' as const,
+          hasProvenance: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }),
+  ];
 
-  // Process Python packages
-  for (const dep of pythonDeps) {
-    try {
-      const result = await verifyPythonPackage(dep.name, dep.version);
-      log(`PyPI ${dep.name}@${dep.version}: hasProvenance=${result.hasProvenance}`, result.error || '');
-      results.push(result);
-    } catch (error) {
-      log(`PyPI ${dep.name}@${dep.version}: ERROR`, error);
-      results.push({
-        packageName: dep.name,
-        version: dep.version,
-        ecosystem: 'pypi',
-        hasProvenance: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+  return runWithConcurrency(tasks, effective_concurrency);
+}
+
+/**
+ * Runs the given async tasks with at most `concurrency` in flight at a time.
+ * Results are returned in the same order as the input tasks.
+ */
+async function runWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number,
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= tasks.length) return;
+      results[index] = await tasks[index]();
     }
-  }
+  });
 
   return results;
 }
@@ -95,24 +120,22 @@ async function verifyNpmPackage(name: string, version: string): Promise<Verifica
 
     log(`Fetching NPM: ${url}`);
 
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-      },
+    const result = await registryFetchRaw(url, {
+      headers: { 'Accept': 'application/json' },
     });
 
-    if (!response.ok) {
-      log(`NPM HTTP error: ${response.status} for ${name}@${version}`);
+    if (!result.ok) {
+      log(`NPM HTTP error: ${result.status} for ${name}@${version}`);
       return {
         packageName: name,
         version,
         ecosystem: 'npm',
         hasProvenance: false,
-        error: `HTTP ${response.status}`,
+        error: `HTTP ${result.status}`,
       };
     }
 
-    const data = await response.json() as {
+    const data = result.data as {
       version?: string;
       dist?: {
         attestations?: {
@@ -177,24 +200,22 @@ async function verifyPythonPackage(name: string, version: string): Promise<Verif
 
     log(`Fetching PyPI: ${url}`);
 
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-      },
+    const result = await registryFetchRaw(url, {
+      headers: { 'Accept': 'application/json' },
     });
 
-    if (!response.ok) {
-      log(`PyPI HTTP error: ${response.status} for ${name}@${version}`);
+    if (!result.ok) {
+      log(`PyPI HTTP error: ${result.status} for ${name}@${version}`);
       return {
         packageName: name,
         version,
         ecosystem: 'pypi',
         hasProvenance: false,
-        error: `HTTP ${response.status}`,
+        error: `HTTP ${result.status}`,
       };
     }
 
-    const data = await response.json() as {
+    const data = result.data as {
       info?: { version?: string };
       urls?: Array<{
         attestations?: {

@@ -1,3 +1,7 @@
+import {
+  registryFetchJson,
+  registryFetchRaw,
+} from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractTarGz } from './tarball.js';
@@ -17,9 +21,7 @@ const DOWNLOADS_BASE = 'https://api.npmjs.org/downloads/point/last-week';
  */
 export async function fetchNpmPackageDoc(packageName: string): Promise<any | null> {
   const encoded = encodeURIComponent(packageName);
-  const res = await fetch(`${REGISTRY_BASE}/${encoded}`);
-  if (!res.ok) throw createRegistryFetchError('npm', packageName, res.status);
-  return res.json() as Promise<any>;
+  return registryFetchJson(`${REGISTRY_BASE}/${encoded}`);
 }
 
 export async function fetchNpmMetadata(packageName: string): Promise<PackageMetadata | null> {
@@ -27,7 +29,7 @@ export async function fetchNpmMetadata(packageName: string): Promise<PackageMeta
 
   const [meta, dlRes] = await Promise.all([
     fetchNpmPackageDoc(packageName),
-    fetch(`${DOWNLOADS_BASE}/${encoded}`).catch(() => null),
+    registryFetchRaw(`${DOWNLOADS_BASE}/${encoded}`).catch(() => null),
   ]);
 
   if (!meta) return null;
@@ -44,8 +46,7 @@ export async function fetchNpmMetadata(packageName: string): Promise<PackageMeta
 
   let weeklyDownloads = 0;
   if (dlRes?.ok) {
-    const dlData = await dlRes.json() as any;
-    weeklyDownloads = dlData.downloads ?? 0;
+    weeklyDownloads = dlRes.data?.downloads ?? 0;
   }
 
   // Current maintainers (top-level list is most reliable for the package as a whole)
@@ -120,7 +121,7 @@ export async function fetchNpmSource(
   const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
   if (!metaRes.ok) throw createRegistryFetchError('npm', packageName, metaRes.status, version);
 
-  const meta = await metaRes.json() as any;
+  const meta = await registryFetchJson(`${REGISTRY_BASE}/${encoded}/${version}`);
   const tarballUrl = meta.dist?.tarball;
   if (!tarballUrl) {
     throw new Error(`npm package ${packageName}@${version} does not expose a tarball URL`);
@@ -183,9 +184,9 @@ export async function fetchNpmSource(
   let newFilesInVersion: string[] | undefined;
   if (previousVersion) {
     try {
-      const prevVersionRes = await fetch(`${REGISTRY_BASE}/${encodeURIComponent(packageName)}/${previousVersion}`);
-      if (prevVersionRes.ok) {
-        const prevMeta = await prevVersionRes.json() as any;
+      const prevResult = await registryFetchRaw(`${REGISTRY_BASE}/${encodeURIComponent(packageName)}/${previousVersion}`);
+      if (prevResult.ok) {
+        const prevMeta = prevResult.data;
         const prevTarball = prevMeta.dist?.tarball;
         if (prevTarball) {
           const prevTarRes = await fetch(prevTarball);

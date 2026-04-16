@@ -1,3 +1,4 @@
+import { registryFetchJson, registryFetchText } from '../../scanner/registry-cache.js';
 import type { PackageMetadata, PackageSource, RegistrySignals } from '../types.js';
 import { createRegistryFetchError } from '../utils.js';
 import { downloadAndExtractZip } from './tarball.js';
@@ -20,17 +21,11 @@ function escapeGoModulePath(modulePath: string): string {
 
 export async function fetchGoMetadata(packageName: string): Promise<PackageMetadata | null> {
   const escaped = escapeGoModulePath(packageName);
-  const [latestRes, versionsRes] = await Promise.all([
-    fetch(`${GO_PROXY_BASE}/${escaped}/@latest`).catch(() => null),
-    fetch(`${GO_PROXY_BASE}/${escaped}/@v/list`).catch(() => null),
+  const [latest, versionsText] = await Promise.all([
+    registryFetchJson<{ Version?: string; Time?: string }>(`${GO_PROXY_BASE}/${escaped}/@latest`),
+    registryFetchText(`${GO_PROXY_BASE}/${escaped}/@v/list`).catch(() => null),
   ]);
-
-  if (!latestRes) throw new Error(`Go proxy request failed for ${packageName}`);
-  if (!latestRes.ok) throw createRegistryFetchError('Go proxy', packageName, latestRes.status);
-
-  const latest = await latestRes.json() as { Version?: string; Time?: string };
-  const versionsText = versionsRes?.ok ? await versionsRes.text() : '';
-  const versions = versionsText.split('\n').map(v => v.trim()).filter(Boolean);
+  const versions = (versionsText ?? '').split('\n').map(v => v.trim()).filter(Boolean);
   const latestVersion = latest.Version ?? '';
   const previousVersion = versions.filter(v => v !== latestVersion).pop();
   const createdAt = latest.Time ?? '';

@@ -105,7 +105,8 @@ wtmp --exclude test fixtures examples
 | `--supply-chain` | | Enable supply chain security analysis | `false` |
 | `--supply-chain-model <model>` | | LLM model for supply chain analysis (see [Providers](#supply-chain-llm-providers)) | `claude-sonnet-4-6` |
 | `--llm-provider <provider>` | | LLM provider — auto-detected from model name when omitted | Auto-detected |
-| `--supply-chain-concurrency <number>` | | Number of concurrent LLM requests | `3` |
+| `--concurrency <number>` | | Number of concurrent network/LLM requests | `8` |
+| `--no-cache` | | Disable registry response caching | `false` |
 | `--supply-chain-dry-run` | | Skip actual LLM calls (for testing) | `false` |
 | `--version` | | Show version | |
 | `--help` | `-h` | Show help | |
