@@ -92,10 +92,6 @@ export interface DependencyTree {
 const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
 
-const CRATES_REGISTRY_CACHE = new Map<string, any>();
-const GO_PROXY_CACHE = new Map<string, any>();
-const RUBYGEMS_CACHE = new Map<string, any>();
-
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
   

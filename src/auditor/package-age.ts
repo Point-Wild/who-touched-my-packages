@@ -21,6 +21,10 @@ async function fetchVersionPublishedAt(
   name: string,
   version: string
 ): Promise<string | null> {
+  // Reuse data already pulled by the dependency-tree resolver when possible
+  // to avoid redundant registry round-trips.
+  const cached = getCachedPublishedAt(ecosystem, name, version);
+  if (cached) return cached;
 
   try {
     switch (ecosystem) {

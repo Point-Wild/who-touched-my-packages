@@ -118,8 +118,6 @@ export async function fetchNpmSource(
   previousVersion?: string
 ): Promise<PackageSource | null> {
   const encoded = encodeURIComponent(packageName);
-  const metaRes = await fetch(`${REGISTRY_BASE}/${encoded}/${version}`);
-  if (!metaRes.ok) throw createRegistryFetchError('npm', packageName, metaRes.status, version);
 
   const meta = await registryFetchJson(`${REGISTRY_BASE}/${encoded}/${version}`);
   const tarballUrl = meta.dist?.tarball;

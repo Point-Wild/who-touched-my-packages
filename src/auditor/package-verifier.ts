@@ -95,6 +95,7 @@ async function runWithConcurrency<T>(
     }
   });
 
+  await Promise.all(workers);
   return results;
 }
 
