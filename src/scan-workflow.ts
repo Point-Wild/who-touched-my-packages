@@ -82,7 +82,7 @@ export async function scanWorkflow(
   let dependencyEdges: DependencyEdge[] = [];
   let unresolvedDependencies: UnresolvedDependency[] = [];
 
-  const needsTree = scanOptions.html || (scanOptions.supplyChain && packageDepth > 1);
+  const needsTree = scanOptions.json || scanOptions.html || (scanOptions.supplyChain && packageDepth > 1);
   logVerbose(`Dependency tree expansion needed: ${needsTree}`);
 
   if (needsTree) {

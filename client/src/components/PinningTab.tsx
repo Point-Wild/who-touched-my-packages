@@ -16,7 +16,7 @@ export function PinningTab({}: PinningTabProps) {
       }}>
         <h3 style={{ marginBottom: '1rem' }}>💡 Best Practices for preventing Supply Chain attacks</h3>
         <ul style={{ color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '1.5rem' }}>
-          <li><strong>CI/CD & Installation:</strong> Use CI commands (e.g., <code>npm ci</code>) over <code>npm install</code> in all CI/CD workflows. Developers should use CI commands with a "firewall" tool such as <a href="https://socket.dev" target="_blank" rel="noopener">socket.dev</a> to block malicious packages</li>
+          <li><strong>CI/CD & Installation:</strong> Use CI commands (e.g., <code>npm ci</code>) over <code>npm install</code> in all CI/CD workflows.</li>
           <li><strong>Lock files:</strong> Use package-lock.json or poetry.lock for additional version locking</li>
           <li><strong>Dependency Review:</strong> Regularly review dependencies for security vulnerabilities and update them promptly</li>
           <li><strong>Vetted Dependencies:</strong> Only use dependencies from trusted sources and maintain a vetted list of approved packages</li>
