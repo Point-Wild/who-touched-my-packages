@@ -2,8 +2,18 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-const REGISTRY_CACHE = new Map<string, any>();
-const PYPI_REGISTRY_CACHE = new Map<string, any>();
+import {
+  registryFetchRaw,
+  registryFetchJson,
+  registryFetchText,
+  NPM_REGISTRY_CACHE,
+  PYPI_REGISTRY_CACHE,
+  CRATES_REGISTRY_CACHE,
+  GO_PROXY_CACHE,
+  RUBYGEMS_CACHE,
+} from './registry-cache.js';
+
+const REGISTRY_CACHE = NPM_REGISTRY_CACHE;
 
 async function fetchPackageFromRegistry(name: string, versionSpec: string): Promise<any | null> {
   const cacheKey = `${name}@${versionSpec}`;
@@ -12,33 +22,20 @@ async function fetchPackageFromRegistry(name: string, versionSpec: string): Prom
   }
 
   try {
-    // Normalize version spec to get a concrete version
     const normalizedVersion = versionSpec.replace(/^[^\d]*/, '') || 'latest';
     const url = `https://registry.npmjs.org/${name}/${normalizedVersion}`;
 
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-    });
+    let result = await registryFetchRaw(url, { headers: { 'Accept': 'application/json' } });
 
-    if (!response.ok) {
-      // Try with 'latest' tag if specific version fails
-      if (normalizedVersion !== 'latest') {
-        const latestUrl = `https://registry.npmjs.org/${name}/latest`;
-        const latestResponse = await fetch(latestUrl, {
-          headers: { 'Accept': 'application/json' },
-        });
-        if (latestResponse.ok) {
-          const data = await latestResponse.json();
-          REGISTRY_CACHE.set(cacheKey, data);
-          return data;
-        }
-      }
-      return null;
+    if (!result.ok && normalizedVersion !== 'latest') {
+      const latestUrl = `https://registry.npmjs.org/${name}/latest`;
+      result = await registryFetchRaw(latestUrl, { headers: { 'Accept': 'application/json' } });
     }
 
-    const data = await response.json();
-    REGISTRY_CACHE.set(cacheKey, data);
-    return data;
+    if (!result.ok) return null;
+
+    REGISTRY_CACHE.set(cacheKey, result.data);
+    return result.data;
   } catch (error) {
     return null;
   }
@@ -51,35 +48,22 @@ async function fetchPypiPackageFromRegistry(name: string, versionSpec: string): 
   }
 
   try {
-    // Normalize version spec to get a concrete version
-    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '').trim() || 'latest';
     const url = normalizedVersion === 'latest'
       ? `https://pypi.org/pypi/${name}/json`
       : `https://pypi.org/pypi/${name}/${normalizedVersion}/json`;
 
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-    });
+    let result = await registryFetchRaw(url, { headers: { 'Accept': 'application/json' } });
 
-    if (!response.ok) {
-      // Try with latest if specific version fails
-      if (normalizedVersion !== 'latest') {
-        const latestUrl = `https://pypi.org/pypi/${name}/json`;
-        const latestResponse = await fetch(latestUrl, {
-          headers: { 'Accept': 'application/json' },
-        });
-        if (latestResponse.ok) {
-          const data = await latestResponse.json();
-          PYPI_REGISTRY_CACHE.set(cacheKey, data);
-          return data;
-        }
-      }
-      return null;
+    if (!result.ok && normalizedVersion !== 'latest') {
+      const latestUrl = `https://pypi.org/pypi/${name}/json`;
+      result = await registryFetchRaw(latestUrl, { headers: { 'Accept': 'application/json' } });
     }
 
-    const data = await response.json();
-    PYPI_REGISTRY_CACHE.set(cacheKey, data);
-    return data;
+    if (!result.ok) return null;
+
+    PYPI_REGISTRY_CACHE.set(cacheKey, result.data);
+    return result.data;
   } catch (error) {
     return null;
   }
@@ -107,10 +91,6 @@ export interface DependencyTree {
 
 const MAX_DEPTH = 10;
 const resolvedCache = new Map<string, any>();
-
-const CRATES_REGISTRY_CACHE = new Map<string, any>();
-const GO_PROXY_CACHE = new Map<string, any>();
-const RUBYGEMS_CACHE = new Map<string, any>();
 
 async function findPackageJson(packageName: string, startPath: string): Promise<string | null> {
   let currentPath = dirname(startPath);
@@ -314,24 +294,17 @@ async function fetchCrateFromRegistry(name: string, versionSpec: string): Promis
   }
 
   try {
-    // Normalize version spec to get a concrete version
-    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
     const url = `https://crates.io/api/v1/crates/${name}`;
+    const headers = {
+      'Accept': 'application/json',
+      'User-Agent': 'who-touched-my-packages (security scanner)',
+    };
 
-    const response = await fetch(url, {
-      headers: { 
-        'Accept': 'application/json',
-        'User-Agent': 'who-touched-my-packages (security scanner)'
-      },
-    });
+    const result = await registryFetchRaw(url, { headers });
+    if (!result.ok) return null;
 
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    CRATES_REGISTRY_CACHE.set(cacheKey, data);
-    return data;
+    CRATES_REGISTRY_CACHE.set(cacheKey, result.data);
+    return result.data;
   } catch (error) {
     return null;
   }
@@ -345,19 +318,15 @@ async function fetchCrateDependencies(name: string, version: string): Promise<an
 
   try {
     const url = `https://crates.io/api/v1/crates/${name}/${version}/dependencies`;
-    const response = await fetch(url, {
-      headers: { 
-        'Accept': 'application/json',
-        'User-Agent': 'who-touched-my-packages (security scanner)'
-      },
-    });
+    const headers = {
+      'Accept': 'application/json',
+      'User-Agent': 'who-touched-my-packages (security scanner)',
+    };
 
-    if (!response.ok) {
-      return null;
-    }
+    const result = await registryFetchRaw(url, { headers });
+    if (!result.ok) return null;
 
-    const data = await response.json() as { dependencies?: any[] };
-    const dependencies = data.dependencies || [];
+    const dependencies = result.data.dependencies || [];
     CRATES_REGISTRY_CACHE.set(cacheKey, dependencies);
     return dependencies;
   } catch (error) {
@@ -524,6 +493,20 @@ interface GoDepInfo {
   isDev?: boolean;
 }
 
+/**
+ * Escape a Go module path for the module proxy URL.
+ * Uppercase letters are encoded as !lowercase per the Go module proxy spec.
+ */
+function escapeGoModulePath(modulePath: string): string {
+  return modulePath
+    .replace(/^["']+|["']+$/g, '')  // strip surrounding quotes
+    .split('/')
+    .map(segment =>
+      encodeURIComponent(segment.replace(/[A-Z]/g, match => `!${match.toLowerCase()}`))
+    )
+    .join('/');
+}
+
 function parseGoModForTree(content: string): GoDepInfo[] {
   const dependencies: GoDepInfo[] = [];
   const lines = content.split('\n');
@@ -576,34 +559,21 @@ async function fetchGoModuleFromProxy(name: string, versionSpec: string): Promis
   }
 
   try {
-    // Go module proxy URL format
-    const encodedName = name.replace(/\//g, '%2F');
+    const encodedName = escapeGoModulePath(name);
     const version = versionSpec.replace(/^[>=<~!^]+/, '').replace(/^v/, '') || 'latest';
     const url = `https://proxy.golang.org/${encodedName}/@v/v${version}.info`;
 
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-    });
+    let result = await registryFetchRaw(url, { headers: { 'Accept': 'application/json' } });
 
-    if (!response.ok) {
-      // Try without v prefix
+    if (!result.ok) {
       const urlNoV = `https://proxy.golang.org/${encodedName}/@v/${version}.info`;
-      const responseNoV = await fetch(urlNoV, {
-        headers: { 'Accept': 'application/json' },
-      });
-      
-      if (!responseNoV.ok) {
-        return null;
-      }
-      
-      const data = await responseNoV.json();
-      GO_PROXY_CACHE.set(cacheKey, data);
-      return data;
+      result = await registryFetchRaw(urlNoV, { headers: { 'Accept': 'application/json' } });
     }
 
-    const data = await response.json();
-    GO_PROXY_CACHE.set(cacheKey, data);
-    return data;
+    if (!result.ok) return null;
+
+    GO_PROXY_CACHE.set(cacheKey, result.data);
+    return result.data;
   } catch (error) {
     return null;
   }
@@ -693,22 +663,16 @@ async function resolveGoDependency(
 
 async function fetchGoModFromProxy(name: string, version: string): Promise<string | null> {
   try {
-    const encodedName = name.replace(/\//g, '%2F');
+    const encodedName = escapeGoModulePath(name);
     const cleanVersion = version.replace(/^v/, '');
-    // Try to fetch go.mod from the module proxy
     const url = `https://proxy.golang.org/${encodedName}/@v/v${cleanVersion}.mod`;
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      // Try without v prefix
+
+    let text = await registryFetchText(url);
+    if (text === null) {
       const urlNoV = `https://proxy.golang.org/${encodedName}/@v/${cleanVersion}.mod`;
-      const responseNoV = await fetch(urlNoV);
-      if (!responseNoV.ok) {
-        return null;
-      }
-      return await responseNoV.text();
+      text = await registryFetchText(urlNoV);
     }
-    return await response.text();
+    return text;
   } catch (error) {
     return null;
   }
@@ -722,6 +686,7 @@ interface RubyDepInfo {
 
 function parseGemfileLockForTree(content: string): RubyDepInfo[] {
   const dependencies: RubyDepInfo[] = [];
+  const seen = new Set<string>();
   const lines = content.split('\n');
   let inSpecsSection = false;
   
@@ -751,15 +716,20 @@ function parseGemfileLockForTree(content: string): RubyDepInfo[] {
     if (inSpecsSection) {
       const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*\(([0-9][^)]*)\)/);
       if (match) {
-        dependencies.push({
-          name: match[1],
-          versionSpec: match[2],
-          isDev: false,
-        });
+        const version = match[2].trim().replace(/-[a-z][\w-]*$/, '');
+        const key = `${match[1]}@${version}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          dependencies.push({
+            name: match[1],
+            versionSpec: version,
+            isDev: false,
+          });
+        }
       }
     }
   }
-  
+
   return dependencies;
 }
 
@@ -770,22 +740,31 @@ async function fetchGemFromRubygems(name: string, versionSpec: string): Promise<
   }
 
   try {
-    const normalizedVersion = versionSpec.replace(/^[>=<~!^]+/, '') || 'latest';
+    // Version specs from gemspecs can be constraints like ">= 1.0, < 2" or "~> 5.1".
+    // Extract the first concrete version number, or fall back to the latest.
+    const firstVersion = versionSpec
+      .split(',')[0]                    // take first constraint
+      .replace(/^[>=<~!^]+/, '')        // strip operators
+      .trim();
+    const normalizedVersion = (firstVersion && /^\d+\.\d+/.test(firstVersion))
+      ? firstVersion
+      : 'latest';
     const url = normalizedVersion === 'latest'
       ? `https://rubygems.org/api/v1/gems/${name}.json`
       : `https://rubygems.org/api/v2/rubygems/${name}/versions/${normalizedVersion}.json`;
 
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-    });
+    let result = await registryFetchRaw(url, { headers: { 'Accept': 'application/json' } });
 
-    if (!response.ok) {
-      return null;
+    // v2 version-specific endpoint can 404 for short versions (e.g. "1.4");
+    // fall back to the v1 gems endpoint which returns the latest version.
+    if (!result.ok && normalizedVersion !== 'latest') {
+      const fallbackUrl = `https://rubygems.org/api/v1/gems/${name}.json`;
+      result = await registryFetchRaw(fallbackUrl, { headers: { 'Accept': 'application/json' } });
     }
+    if (!result.ok) return null;
 
-    const data = await response.json();
-    RUBYGEMS_CACHE.set(cacheKey, data);
-    return data;
+    RUBYGEMS_CACHE.set(cacheKey, result.data);
+    return result.data;
   } catch (error) {
     return null;
   }
@@ -935,9 +914,12 @@ export async function buildDependencyTree(
         if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('-')) {
           continue;
         }
-        
+
+        const withoutComment = trimmed.split('#')[0].trim();
+        if (!withoutComment) continue;
+
         // Parse package specification: package==1.0.0, package>=1.0.0, package~=1.0.0, package
-        const match = trimmed.match(/^([a-zA-Z0-9_.-]+)([>=<~!]+)?(.+)?/);
+        const match = withoutComment.match(/^([a-zA-Z0-9_.-]+)([>=<~!]+)?(.+)?/);
         
         if (match) {
           const name = match[1];

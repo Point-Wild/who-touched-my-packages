@@ -9,7 +9,6 @@ import type { FinalReport } from './types';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [isNode, setIsNode] = useState(false);
   const [data, setData] = useState<FinalReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +25,6 @@ export function App() {
         setLoading(false);
       });
   }, []);
-
-  useEffect(() => {
-    if (data) {
-      const hasNode = data.reportData.dependencies.some(dep => dep.ecosystem === 'npm');
-      setIsNode(hasNode);
-    }
-  }, [data]);
 
   const getRepoName = () => {
     if (!data?.reportData.repositoryUrl) return null;
@@ -178,14 +170,12 @@ export function App() {
         >
           📦 Dependencies
         </button>
-        { isNode && 
-          <button
-            className={`tab ${activeTab === 'pinning' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pinning')}
-          >
-            📌 Pinning Issues
-          </button>
-        }
+        <button
+          className={`tab ${activeTab === 'pinning' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pinning')}
+        >
+          📌 Pinning Issues
+        </button>
         {data.reportData.unresolvedDependencies && data.reportData.unresolvedDependencies.length > 0 && (
           <button
             className={`tab ${activeTab === 'unresolved' ? 'active' : ''}`}

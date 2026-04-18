@@ -66,7 +66,7 @@ export const PROVIDERS: Record<LLMProvider, ProviderConfig> = {
 
 export const DEFAULT_PROVIDER: LLMProvider = 'anthropic';
 export const DEFAULT_MODEL = PROVIDERS[DEFAULT_PROVIDER].models[0];
-export const DEFAULT_CONCURRENCY = 3;
+export const DEFAULT_CONCURRENCY = 8;
 
 /**
  * Infer the LLM provider from a model name.

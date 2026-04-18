@@ -105,10 +105,23 @@ wtmp --exclude test fixtures examples
 | `--supply-chain` | | Enable supply chain security analysis | `false` |
 | `--supply-chain-model <model>` | | LLM model for supply chain analysis (see [Providers](#supply-chain-llm-providers)) | `claude-sonnet-4-6` |
 | `--llm-provider <provider>` | | LLM provider — auto-detected from model name when omitted | Auto-detected |
-| `--supply-chain-concurrency <number>` | | Number of concurrent LLM requests | `3` |
+| `--concurrency <number>` | | Number of concurrent network/LLM requests | `8` |
+| `--no-cache` | | Disable registry response caching | `false` |
 | `--supply-chain-dry-run` | | Skip actual LLM calls (for testing) | `false` |
 | `--version` | | Show version | |
 | `--help` | `-h` | Show help | |
+
+## 🗄️ Registry Cache
+
+By default, the tool caches all JSON responses from package registries (npm, PyPI, crates.io, Go proxy, RubyGems) in memory during a scan. This **L1 URL-keyed cache** eliminates redundant network requests when multiple pipeline stages (dependency resolution, provenance verification, package age lookup, supply chain analysis) query the same registry endpoints.
+
+The cache also deduplicates in-flight requests — if two concurrent tasks request the same URL before the first completes, only one network call is made and both receive the same result. Failed responses (404s) are also cached to avoid retrying known-bad URLs.
+
+To disable caching (useful for debugging or ensuring fresh data):
+
+```bash
+# Disable cache
+bun src/index.ts --repo https://github.com/your/repo --no-cache
 
 ## 📄 HTML Reports (Default Output)
 

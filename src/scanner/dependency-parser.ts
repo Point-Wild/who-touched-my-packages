@@ -420,10 +420,13 @@ function parseRequirementsTxt(content: string, filePath: string): Dependency[] {
     if (trimmed.startsWith('-')) {
       continue;
     }
-    
+
+    const withoutComment = trimmed.split('#')[0].trim();
+    if (!withoutComment) continue;
+
     // Parse package specification
     // Formats: package==1.0.0, package>=1.0.0, package~=1.0.0, package
-    const match = trimmed.match(/^([a-zA-Z0-9_-]+)([>=<~!]+)?(.+)?/);
+    const match = withoutComment.match(/^([a-zA-Z0-9_-]+)([>=<~!]+)?(.+)?/);
     
     if (match) {
       const name = match[1];

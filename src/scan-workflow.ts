@@ -20,6 +20,7 @@ export interface ScanWorkflowOptions {
   quiet: boolean;
   verbose: boolean;
   repo?: string;
+  concurrency?: string;
 }
 
 export async function scanWorkflow(
@@ -81,7 +82,7 @@ export async function scanWorkflow(
   let dependencyEdges: DependencyEdge[] = [];
   let unresolvedDependencies: UnresolvedDependency[] = [];
 
-  const needsTree = scanOptions.html || (scanOptions.supplyChain && packageDepth > 1);
+  const needsTree = scanOptions.json || scanOptions.html || (scanOptions.supplyChain && packageDepth > 1);
   logVerbose(`Dependency tree expansion needed: ${needsTree}`);
 
   if (needsTree) {
@@ -124,14 +125,30 @@ export async function scanWorkflow(
     }
 
     for (const file of pythonFiles) {
-      const pythonDeps = scannedDependencies.filter(d => d.file === file.path && d.ecosystem === 'pypi');
-      logVerbose(`Using direct Python dependencies for ${file.path}: ${pythonDeps.length}`);
-      for (const dep of pythonDeps) {
-        const key = `${dep.name}@${dep.version}`;
-        if (!allTreeNodes.has(key)) {
-          allTreeNodes.set(key, dep);
+        try {
+            const tree = await buildDependencyTree(file.path, 'pypi');
+            const flatDeps = flattenDependencyTree(tree);
+            logVerbose(`Resolved pypi tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
+
+            flatDeps.forEach(dep => {
+            const key = `${dep.name}@${dep.version}`;
+            if (!allTreeNodes.has(key)) {
+                allTreeNodes.set(key, dep);
+            } else {
+                const existing = allTreeNodes.get(key)!;
+                if (dep.paths) {
+                existing.paths = existing.paths || [];
+                existing.paths.push(...dep.paths);
+                }
+            }
+            });
+
+            dependencyEdges.push(...tree.edges);
+            unresolvedDependencies.push(...tree.unresolved);
+        } catch (error) {
+            logVerbose(`Failed to build pypi tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
+            // Skip files that fail to parse
         }
-      }
     }
 
     for (const file of rustFiles) {
@@ -231,8 +248,10 @@ export async function scanWorkflow(
     spinner.text = 'Verifying package provenance...';
   }
 
+  const concurrency = parseInt(scanOptions.concurrency ?? '10', 10);
+
   try {
-    const verificationResults = await verifyPackages(allDependencies);
+    const verificationResults = await verifyPackages(allDependencies, concurrency);
     logVerbose(`Package provenance results received: ${verificationResults.length}`);
     applyVerificationResults(allDependencies, verificationResults);
     if (allDependencies !== scannedDependencies) {
@@ -264,7 +283,7 @@ export async function scanWorkflow(
       spinner.text = 'Fetching package release dates...';
     }
     try {
-      const ages = await fetchPackageAges(auditResult.vulnerabilities);
+      const ages = await fetchPackageAges(auditResult.vulnerabilities, concurrency);
       applyPackageAges(auditResult.vulnerabilities, ages);
       logVerbose(`Package ages resolved for ${ages.size} unique package versions`);
     } catch (error) {

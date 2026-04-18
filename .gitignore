@@ -5,6 +5,8 @@ dist/
 .env
 .env.local
 *.tsbuildinfo
+tests/logs/
+tests/benchmarks
 docs/.astro
 docs/node_modules/
 .astro/
