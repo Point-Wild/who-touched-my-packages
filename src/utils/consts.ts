@@ -1,0 +1,1 @@
+export const WTMP_TELEMETRY_SERVER = "https://wtmp-0xx-06ev8v2svds5d5bklshm8otgmk.aws-use2.surreal.cloud/";

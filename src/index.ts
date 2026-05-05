@@ -16,6 +16,7 @@ import { shouldFailOnSeverity } from './utils/config.js';
 import { cloneRepository } from './utils/git-clone.js';
 import { setCacheEnabled } from './scanner/registry-cache.js';
 import { Logger } from './utils/logger.js';
+import { collectTelemetry, sendTelemetry } from './utils/telemetry.js';
 
 const program = new Command();
 export const DEFAULT_NW_CONCURRENCY = 1;
@@ -37,6 +38,7 @@ interface CLIOptions extends ScanWorkflowOptions {
   supplyChainMaxPackages: string;
   supplyChainDryRun: boolean;
   cache: boolean;
+  ci: boolean;
 }
 
 program
@@ -70,6 +72,7 @@ program
   .option('--supply-chain-dry-run', 'Skip actual LLM calls (for testing)', false)
   .option('--cache', 'Enable registry response caching (default: true)', true)
   .option('--no-cache', 'Disable registry response caching')
+  .option('--ci', 'Run in CI mode (disables interactive email prompt, auto-detects CI environment)', false)
   .parse();
 
 const options = program.opts() as CLIOptions;
@@ -81,7 +84,7 @@ if (options.color === false) {
 }
 
 // Auto-disable HTML generation in CI environments
-const isCI = process.env.CI ||
+const envCI = process.env.CI ||
   process.env.GITHUB_ACTIONS ||
   process.env.GITLAB_CI ||
   process.env.CIRCLECI ||
@@ -90,6 +93,8 @@ const isCI = process.env.CI ||
   process.env.BUILDKITE ||
   process.env.JENKINS ||
   process.env.TEAMCITY_VERSION;
+
+const isCI = options.ci || !!envCI;
 
 if (isCI) {
   options.html = false;
@@ -128,6 +133,16 @@ function restoreTerminalInput(): void {
 }
 
 async function main() {
+  // Collect and send telemetry before running the scan
+  try {
+    const telemetry = await collectTelemetry(Package.version, isCI);
+    if (telemetry) {
+      await sendTelemetry(telemetry);
+    }
+  } catch {
+    // Telemetry is best-effort; don't fail the tool if it doesn't send
+  }
+
   if (!options.cache) {
     setCacheEnabled(false);
   }
