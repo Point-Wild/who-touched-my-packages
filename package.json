@@ -86,7 +86,7 @@
     "react-dom": "19.2.0",
     "recharts": "2.15.0",
     "typescript": "5.9.3",
-    "vite": "7.3.1"
+    "vite": "7.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
