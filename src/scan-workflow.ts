@@ -90,145 +90,44 @@ export async function scanWorkflow(
       spinner.text = 'Building dependency trees...';
     }
 
-    const npmFiles = files.filter(f => f.type === 'package.json');
-    const pythonFiles = files.filter(f => f.type === 'requirements.txt');
-    const rustFiles = files.filter(f => f.type === 'Cargo.toml');
-    const goFiles = files.filter(f => f.type === 'go.mod');
-    const rubyFiles = files.filter(f => f.type === 'Gemfile.lock');
+    const ecosystemFileTypes: Array<{ type: string; ecosystem: 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby' }> = [
+      { type: 'package.json', ecosystem: 'npm' },
+      { type: 'requirements.txt', ecosystem: 'pypi' },
+      { type: 'Cargo.toml', ecosystem: 'cargo' },
+      { type: 'go.mod', ecosystem: 'go' },
+      { type: 'Gemfile.lock', ecosystem: 'ruby' },
+    ];
+
     const allTreeNodes = new Map<string, Dependency>();
 
-    for (const file of npmFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'npm');
-        const flatDeps = flattenDependencyTree(tree);
-        logVerbose(`Resolved npm tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
+    for (const { type, ecosystem } of ecosystemFileTypes) {
+      const ecosystemFiles = files.filter(f => f.type === type);
 
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        logVerbose(`Failed to build npm tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
-        // Skip files that fail to parse
-      }
-    }
-
-    for (const file of pythonFiles) {
+      for (const file of ecosystemFiles) {
         try {
-            const tree = await buildDependencyTree(file.path, 'pypi');
-            const flatDeps = flattenDependencyTree(tree);
-            logVerbose(`Resolved pypi tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
+          const tree = await buildDependencyTree(file.path, ecosystem);
+          const flatDeps = flattenDependencyTree(tree);
+          logVerbose(`Resolved ${ecosystem} tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
 
-            flatDeps.forEach(dep => {
+          flatDeps.forEach(dep => {
             const key = `${dep.name}@${dep.version}`;
             if (!allTreeNodes.has(key)) {
-                allTreeNodes.set(key, dep);
+              allTreeNodes.set(key, dep);
             } else {
-                const existing = allTreeNodes.get(key)!;
-                if (dep.paths) {
+              const existing = allTreeNodes.get(key)!;
+              if (dep.paths) {
                 existing.paths = existing.paths || [];
                 existing.paths.push(...dep.paths);
-                }
+              }
             }
-            });
+          });
 
-            dependencyEdges.push(...tree.edges);
-            unresolvedDependencies.push(...tree.unresolved);
+          dependencyEdges.push(...tree.edges);
+          unresolvedDependencies.push(...tree.unresolved);
         } catch (error) {
-            logVerbose(`Failed to build pypi tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
-            // Skip files that fail to parse
+          logVerbose(`Failed to build ${ecosystem} tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
+          // Skip files that fail to parse
         }
-    }
-
-    for (const file of rustFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'cargo');
-        const flatDeps = flattenDependencyTree(tree);
-        logVerbose(`Resolved cargo tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        logVerbose(`Failed to build cargo tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
-        // Skip files that fail to parse
-      }
-    }
-
-    for (const file of goFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'go');
-        const flatDeps = flattenDependencyTree(tree);
-        logVerbose(`Resolved go tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        logVerbose(`Failed to build go tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
-        // Skip files that fail to parse
-      }
-    }
-
-    for (const file of rubyFiles) {
-      try {
-        const tree = await buildDependencyTree(file.path, 'ruby');
-        const flatDeps = flattenDependencyTree(tree);
-        logVerbose(`Resolved ruby tree for ${file.path}: ${flatDeps.length} dependencies, ${tree.edges.length} edges, ${tree.unresolved.length} unresolved`);
-
-        flatDeps.forEach(dep => {
-          const key = `${dep.name}@${dep.version}`;
-          if (!allTreeNodes.has(key)) {
-            allTreeNodes.set(key, dep);
-          } else {
-            const existing = allTreeNodes.get(key)!;
-            if (dep.paths) {
-              existing.paths = existing.paths || [];
-              existing.paths.push(...dep.paths);
-            }
-          }
-        });
-
-        dependencyEdges.push(...tree.edges);
-        unresolvedDependencies.push(...tree.unresolved);
-      } catch (error) {
-        logVerbose(`Failed to build ruby tree for ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
-        // Skip files that fail to parse
       }
     }
 

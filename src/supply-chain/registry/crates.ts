@@ -7,6 +7,7 @@ import {
   isDependencyConfusion,
   computeRegistryRiskScore,
 } from './signals.js';
+import { computeTimeSignals } from './shared.js';
 
 const CRATES_BASE = 'https://crates.io/api/v1/crates';
 
@@ -21,11 +22,7 @@ export async function fetchCratesMetadata(packageName: string): Promise<PackageM
   const updatedAt = crate.updated_at ?? newestVersion.updated_at ?? '';
   const maintainers = Array.isArray(data.keywords) ? data.keywords.map((k: any) => String(k.id ?? k.keyword ?? '')) : [];
 
-  const now = Date.now();
-  const packageAgeDays = createdAt
-    ? Math.floor((now - new Date(createdAt).getTime()) / 86_400_000) : 0;
-  const publishedDaysAgo = updatedAt
-    ? Math.floor((now - new Date(updatedAt).getTime()) / 86_400_000) : 0;
+  const { packageAgeDays, publishedDaysAgo } = computeTimeSignals(createdAt, updatedAt);
 
   const signalsWithoutScore: Omit<RegistrySignals, 'riskScore'> = {
     maintainerChangedInLatestRelease: false,

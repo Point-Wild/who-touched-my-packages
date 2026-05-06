@@ -10,6 +10,7 @@ import {
   isDependencyConfusion,
   computeRegistryRiskScore,
 } from './signals.js';
+import { computeTimeSignals } from './shared.js';
 
 const REGISTRY_BASE = 'https://registry.npmjs.org';
 const DOWNLOADS_BASE = 'https://api.npmjs.org/downloads/point/last-week';
@@ -70,13 +71,9 @@ export async function fetchNpmMetadata(packageName: string): Promise<PackageMeta
   const hasProvenance = !!(latestMeta.dist?.attestations);
 
   // Time signals
-  const now = Date.now();
   const createdAt = time.created ?? '';
   const updatedAt = time.modified ?? '';
-  const packageAgeDays = createdAt
-    ? Math.floor((now - new Date(createdAt).getTime()) / 86_400_000) : 0;
-  const publishedDaysAgo = updatedAt
-    ? Math.floor((now - new Date(updatedAt).getTime()) / 86_400_000) : 0;
+  const { packageAgeDays, publishedDaysAgo } = computeTimeSignals(createdAt, updatedAt);
 
   const signalsWithoutScore: Omit<RegistrySignals, 'riskScore'> = {
     maintainerChangedInLatestRelease: newMaintainers.length > 0,
