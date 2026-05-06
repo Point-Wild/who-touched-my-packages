@@ -15,8 +15,9 @@ import { shouldFailOnSeverity } from './utils/config.js';
 import { cloneRepository } from './utils/git-clone.js';
 import { setCacheEnabled } from './scanner/registry-cache.js';
 import { Logger } from './utils/logger.js';
-import { collectTelemetry, sendTelemetry } from './utils/telemetry.js';
+import { collectSystemTelemetry, collectEmail, submitSystemTelemetry, submitUserTelemetry } from './utils/telemetry.js';
 import { openInBrowser } from './utils/open';
+import { randomUUID } from 'node:crypto';
 
 const program = new Command();
 export const DEFAULT_NW_CONCURRENCY = 1;
@@ -135,10 +136,11 @@ function restoreTerminalInput(): void {
 async function main() {
   // Collect and send telemetry before running the scan
   try {
-    const telemetry = await collectTelemetry(Package.version, isCI);
-    if (telemetry) {
-      await sendTelemetry(telemetry);
-    }
+    const run_id = randomUUID();
+    const systemTelemetry = collectSystemTelemetry(Package.version);
+    await submitSystemTelemetry(systemTelemetry, run_id);
+    const email = await collectEmail(isCI);
+    await submitUserTelemetry({ email }, run_id);
   } catch {
     // Telemetry is best-effort; don't fail the tool if it doesn't send
   }

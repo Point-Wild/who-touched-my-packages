@@ -1,6 +1,7 @@
 import * as clack from '@clack/prompts';
 import os from 'node:os';
 import { WTMP_TELEMETRY_SERVER } from './consts.js';
+import { randomUUID } from 'node:crypto';
 
 export interface TelemetryPayload {
   email: string;
@@ -27,32 +28,25 @@ function detectCIEnvironment(): string | undefined {
   return undefined;
 }
 
-export async function collectTelemetry(version: string, isCI: boolean): Promise<TelemetryPayload | null> {
-  let email: string;
+export interface SystemTelemetryPayload {
+  os: string;
+  platform: string;
+  arch: string;
+  cpus: number;
+  memory: number;
+  ci_environment?: string;
+  timestamp: string;
+  version: string;
+}
 
-  if (isCI) {
-    email = 'ci@automated.run';
-  } else {
-    const result = await clack.text({
-      message: 'Please provide your email address for usage analytics (required):',
-      validate(value) {
-        if (!value) return 'Email is required';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Please enter a valid email address';
-      },
-    });
+export interface UserTelemetryPayload {
+  email: string;
+}
 
-    if (clack.isCancel(result)) {
-      console.error('Email is required to use this tool. Use --ci for CI environments.');
-      process.exit(1);
-    }
-
-    email = result;
-  }
-
+export function collectSystemTelemetry(version: string): SystemTelemetryPayload {
   const totalMemoryGB = Math.round(os.totalmem() / 1024 / 1024 / 1024);
 
   return {
-    email,
     os: os.type(),
     platform: os.platform(),
     arch: os.arch(),
@@ -64,11 +58,42 @@ export async function collectTelemetry(version: string, isCI: boolean): Promise<
   };
 }
 
-export async function sendTelemetry(payload: TelemetryPayload): Promise<void> {
+export async function collectEmail(isCI: boolean): Promise<string> {
+  if (isCI) {
+    return 'ci@automated.run';
+  }
+
+  const result = await clack.text({
+    message: 'Your email will be used for product analytics and to send you updates and offers regarding Threat Point in accordance with our privacy policy at https://www.pointwild.com/legal/privacy-policy.\nEnter email address(required): ',
+    validate(value) {
+      if (!value) return 'Email is required';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Please enter a valid email address';
+    },
+  });
+
+  if (clack.isCancel(result)) {
+    console.error('Email is required to use this tool. Use --ci for CI environments.');
+    process.exit(1);
+  }
+
+  return result;
+}
+
+export async function collectTelemetry(version: string, isCI: boolean): Promise<TelemetryPayload | null> {
+  const email = await collectEmail(isCI);
+  const systemTelemetry = collectSystemTelemetry(version);
+
+  return {
+    email,
+    ...systemTelemetry,
+  };
+}
+
+export async function submitUserTelemetry(payload: UserTelemetryPayload, run_id: string): Promise<void> {
   const serverUrl = process.env.WTMP_TELEMETRY_SERVER ?? WTMP_TELEMETRY_SERVER;
   const url = `${serverUrl}sql`;
 
-  const query = `CREATE telemetry SET email = '${escapeString(payload.email)}', os = '${escapeString(payload.os)}', platform = '${escapeString(payload.platform)}', arch = '${escapeString(payload.arch)}', cpus = ${payload.cpus}, memory = ${payload.memory}, ci_environment = ${payload.ci_environment ? `'${escapeString(payload.ci_environment)}'` : 'NONE'}, version = '${escapeString(payload.version)}'`;
+  const query = `UPDATE telemetry:u'${run_id}' MERGE { email: '${escapeString(payload.email)}' }`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -85,7 +110,29 @@ export async function sendTelemetry(payload: TelemetryPayload): Promise<void> {
     const text = await response.text().catch(() => 'Unknown error');
     throw new Error(`Telemetry submission failed: ${response.status} ${response.statusText} - ${text}`);
   }
-  console.log(await response.text());
+}
+
+export async function submitSystemTelemetry(payload: SystemTelemetryPayload, run_id: string): Promise<void> {
+  const serverUrl = process.env.WTMP_TELEMETRY_SERVER ?? WTMP_TELEMETRY_SERVER;
+  const url = `${serverUrl}sql`;
+
+  const query = `CREATE telemetry:u'${run_id}' SET os = '${escapeString(payload.os)}', platform = '${escapeString(payload.platform)}', arch = '${escapeString(payload.arch)}', cpus = ${payload.cpus}, memory = ${payload.memory}, ci_environment = ${payload.ci_environment ? `'${escapeString(payload.ci_environment)}'` : 'NONE'}, version = '${escapeString(payload.version)}'`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain',
+      'Accept': 'application/json',
+      'surreal-ns': 'wtmp',
+      'surreal-db': 'main'
+    },
+    body: query,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => 'Unknown error');
+    throw new Error(`Telemetry submission failed: ${response.status} ${response.statusText} - ${text}`);
+  }
 }
 
 function escapeString(str: string): string {
