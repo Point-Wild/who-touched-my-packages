@@ -70,7 +70,6 @@
     "@langchain/langgraph": "1.2.9",
     "@langchain/openai": "1.4.5",
     "commander": "11.1.0",
-    "open": "10.1.0",
     "ora": "8.2.0",
     "picocolors": "1.1.1"
   },
