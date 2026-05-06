@@ -2,6 +2,9 @@ import * as clack from '@clack/prompts';
 import os from 'node:os';
 import { WTMP_TELEMETRY_SERVER } from './consts.js';
 import { randomUUID } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 export interface TelemetryPayload {
   email: string;
@@ -43,6 +46,34 @@ export interface UserTelemetryPayload {
   email: string;
 }
 
+interface WtmpCache {
+  email?: string;
+}
+
+const WTMP_CACHE_PATH = join(homedir(), '.wtmp');
+
+async function readCachedEmail(): Promise<string | null> {
+  try {
+    const content = await readFile(WTMP_CACHE_PATH, 'utf-8');
+    const cache: WtmpCache = JSON.parse(content);
+    if (cache.email && typeof cache.email === 'string') {
+      return cache.email;
+    }
+  } catch {
+    // File doesn't exist, is corrupted, or has invalid JSON - ignore and return null
+  }
+  return null;
+}
+
+async function cacheEmail(email: string): Promise<void> {
+  try {
+    const cache: WtmpCache = { email };
+    await writeFile(WTMP_CACHE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
+  } catch {
+    // Failed to write cache - ignore and continue
+  }
+}
+
 export function collectSystemTelemetry(version: string): SystemTelemetryPayload {
   const totalMemoryGB = Math.round(os.totalmem() / 1024 / 1024 / 1024);
 
@@ -63,6 +94,12 @@ export async function collectEmail(isCI: boolean): Promise<string> {
     return 'ci@automated.run';
   }
 
+  // Try to read cached email first
+  const cachedEmail = await readCachedEmail();
+  if (cachedEmail) {
+    return cachedEmail;
+  }
+
   const result = await clack.text({
     message: 'Your email will be used for product analytics and to send you updates and offers regarding Threat Point in accordance with our privacy policy at https://www.pointwild.com/legal/privacy-policy.\nEnter email address(required): ',
     validate(value) {
@@ -75,6 +112,9 @@ export async function collectEmail(isCI: boolean): Promise<string> {
     console.error('Email is required to use this tool. Use --ci for CI environments.');
     process.exit(1);
   }
+
+  // Cache the email for future use
+  await cacheEmail(result);
 
   return result;
 }
