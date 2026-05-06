@@ -142,7 +142,7 @@ console.log('\n── Phase 1: Rust/Go registry signals (live API) ──');
   if (meta) {
     const s = meta.registrySignals!;
     assert('serde: registrySignals present', !!s);
-    assert('serde: ecosystem = cratesio', meta.ecosystem === 'cratesio', `got ${meta.ecosystem}`);
+    assert('serde: ecosystem = cargo', meta.ecosystem === 'cargo', `got ${meta.ecosystem}`);
     assert('serde: latestVersion populated', !!meta.latestVersion, `got ${meta.latestVersion}`);
     assert('serde: no install scripts', meta.hasInstallScripts === false);
   }
@@ -153,7 +153,7 @@ console.log('\n── Phase 1: Rust/Go registry signals (live API) ──');
   if (meta) {
     const s = meta.registrySignals!;
     assert('go module: registrySignals present', !!s);
-    assert('go module: ecosystem = golang', meta.ecosystem === 'golang', `got ${meta.ecosystem}`);
+    assert('go module: ecosystem = go', meta.ecosystem === 'go', `got ${meta.ecosystem}`);
     assert('go module: latestVersion populated', !!meta.latestVersion, `got ${meta.latestVersion}`);
   }
 }

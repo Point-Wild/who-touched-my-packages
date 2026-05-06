@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import open from 'open';
 import { parseTestLLMOptions } from './helpers/llm-options.js';
 import { scanWorkflow, type ScanWorkflowOptions } from '../src/scan-workflow.js';
 import { buildFinalReport, displayAggregatedReport } from '../src/ui/aggregated-report.js';
@@ -251,10 +250,7 @@ logStep('Generating HTML report server.');
 const reporter = new Reporter({ html: true, verbose: true });
 const server = await reporter.generateHtmlReport(finalReport);
 
-logStep('Opening HTML report in browser.');
-await open(server.url);
-
-console.log(`\n📄 Report opened in browser: ${server.url}`);
+console.log(`\n📄 Report available at: ${server.url}`);
 console.log('Server running. Press Ctrl+C to stop.\n');
 
 process.on('SIGINT', () => {
