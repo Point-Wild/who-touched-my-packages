@@ -55,7 +55,7 @@ const URL_TEXT_CACHE = new Map<string, string>();
  * first one resolves, the second one piggy-backs on the same promise instead
  * of opening a new connection.
  */
-const INFLIGHT_JSON = new Map<string, Promise<any>>();
+const INFLIGHT_JSON = new Map<string, Promise<unknown>>();
 const INFLIGHT_TEXT = new Map<string, Promise<string | null>>();
 
 /**
@@ -67,7 +67,7 @@ const INFLIGHT_TEXT = new Map<string, Promise<string | null>>();
  * **Binary downloads (tarballs, .crate, .gem, .zip) must NOT use this** —
  * call native `fetch()` directly for those.
  */
-export async function registryFetchJson<T = any>(
+export async function registryFetchJson<T = unknown>(
   url: string,
   init?: RequestInit,
 ): Promise<T> {
@@ -156,7 +156,7 @@ export async function registryFetchText(
  * Still deduplicates at the URL level by caching the parsed JSON body.
  * Returns `{ ok, status, data }` so callers can branch on status.
  */
-type RawResult = { ok: true; status: number; data: any } | { ok: false; status: number; data: null };
+type RawResult = { ok: true; status: number; data: unknown } | { ok: false; status: number; data: null };
 const INFLIGHT_RAW = new Map<string, Promise<RawResult>>();
 
 export async function registryFetchRaw(
@@ -214,11 +214,11 @@ export async function registryFetchRaw(
 
 export type RegistryEcosystem = 'npm' | 'pypi' | 'cargo' | 'go' | 'ruby';
 
-export const NPM_REGISTRY_CACHE = new Map<string, any>();
-export const PYPI_REGISTRY_CACHE = new Map<string, any>();
-export const CRATES_REGISTRY_CACHE = new Map<string, any>();
-export const GO_PROXY_CACHE = new Map<string, any>();
-export const RUBYGEMS_CACHE = new Map<string, any>();
+export const NPM_REGISTRY_CACHE = new Map<string, unknown>();
+export const PYPI_REGISTRY_CACHE = new Map<string, unknown>();
+export const CRATES_REGISTRY_CACHE = new Map<string, unknown>();
+export const GO_PROXY_CACHE = new Map<string, unknown>();
+export const RUBYGEMS_CACHE = new Map<string, unknown>();
 
 /**
  * Attempt to extract an ISO publish timestamp for a specific (name, version)

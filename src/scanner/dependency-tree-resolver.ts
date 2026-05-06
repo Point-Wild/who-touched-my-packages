@@ -555,7 +555,7 @@ function parseGoModForTree(content: string): GoDepInfo[] {
 async function fetchGoModuleFromProxy(name: string, versionSpec: string): Promise<any | null> {
   const cacheKey = `${name}@${versionSpec}`;
   if (GO_PROXY_CACHE.has(cacheKey)) {
-    return GO_PROXY_CACHE.get(cacheKey);
+    return GO_PROXY_CACHE.get(cacheKey) as any | null;
   }
 
   try {
@@ -736,7 +736,7 @@ function parseGemfileLockForTree(content: string): RubyDepInfo[] {
 async function fetchGemFromRubygems(name: string, versionSpec: string): Promise<any | null> {
   const cacheKey = `${name}@${versionSpec}`;
   if (RUBYGEMS_CACHE.has(cacheKey)) {
-    return RUBYGEMS_CACHE.get(cacheKey);
+    return RUBYGEMS_CACHE.get(cacheKey) as any | null;
   }
 
   try {

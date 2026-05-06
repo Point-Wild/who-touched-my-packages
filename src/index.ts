@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process';
 import { Command } from 'commander';
 import { resolve } from 'node:path';
 import { cwd } from 'node:process';
-import open from 'open';
 import ora from 'ora';
 
 import * as Package from "../package.json" assert { type: "json" };
@@ -17,6 +16,7 @@ import { cloneRepository } from './utils/git-clone.js';
 import { setCacheEnabled } from './scanner/registry-cache.js';
 import { Logger } from './utils/logger.js';
 import { collectTelemetry, sendTelemetry } from './utils/telemetry.js';
+import { openInBrowser } from './utils/open';
 
 const program = new Command();
 export const DEFAULT_NW_CONCURRENCY = 1;
@@ -302,7 +302,7 @@ async function main() {
         console.log(theme.info(`\n📄 Opening report in browser...`));
       }
       
-      await open(server.url);
+      openInBrowser(server.url);
       restoreTerminalInput();
       
       if (!options.json && !options.quiet) {

@@ -10,6 +10,7 @@ import {
   isDependencyConfusion,
   computeRegistryRiskScore,
 } from './signals.js';
+import { computeTimeSignals } from './shared.js';
 
 const PYPI_BASE = 'https://pypi.org/pypi';
 const STATS_BASE = 'https://pypistats.org/api/packages';
@@ -52,11 +53,7 @@ export async function fetchPypiMetadata(packageName: string): Promise<PackageMet
   );
 
   // Registry risk signals
-  const now = Date.now();
-  const packageAgeDays = createdAt
-    ? Math.floor((now - new Date(createdAt).getTime()) / 86_400_000) : 0;
-  const publishedDaysAgo = updatedAt
-    ? Math.floor((now - new Date(updatedAt).getTime()) / 86_400_000) : 0;
+  const { packageAgeDays, publishedDaysAgo } = computeTimeSignals(createdAt, updatedAt);
 
   // PyPI Trusted Publisher provenance: check if any release file has
   // metadata_version >= 2.3 (the version that added provenance support)
