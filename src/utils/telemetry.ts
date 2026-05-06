@@ -101,7 +101,7 @@ export async function collectEmail(isCI: boolean): Promise<string> {
   }
 
   const result = await clack.text({
-    message: 'Your email will be used for product analytics and to send you updates and offers regarding Threat Point in accordance with our privacy policy at https://www.pointwild.com/legal/privacy-policy.\nEnter email address(required): ',
+    message: 'Your email will be used for product analytics and to send you updates and offers regarding Threat Point in accordance with our privacy policy at https://www.pointwild.com/legal/privacy-policy.\nEnter email address (required): ',
     validate(value) {
       if (!value) return 'Email is required';
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Please enter a valid email address';
