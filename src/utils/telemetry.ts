@@ -86,7 +86,6 @@ export async function sendTelemetry(payload: TelemetryPayload): Promise<void> {
     throw new Error(`Telemetry submission failed: ${response.status} ${response.statusText} - ${text}`);
   }
   console.log(await response.text());
-  process.exit(0);
 }
 
 function escapeString(str: string): string {
