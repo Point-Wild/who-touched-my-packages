@@ -5,14 +5,18 @@ import type { PackageMetadata, PackageSource, SupplyChainFinding } from '../type
 import { createPackageTools, buildContentMap, runTriage, formatTriageResults } from '../llm/tools.js';
 import { buildAgentSystemPrompt, buildFileAnalysisPrompt } from '../llm/prompts.js';
 import { pMap } from '../utils.js';
+import { scorePackage } from '../ml/scoring.js';
 
 /** Max LLM rounds per file for the agentic loop (grep, read_file, etc.) */
 const MAX_ROUNDS_PER_FILE = 10;
 const MAX_INVOKE_RETRIES = 3;
 const INVOKE_RETRY_DELAY_MS = 750;
 
-/** Minimum triage score for a file to be investigated */
-const MIN_TRIAGE_SCORE = 8;
+/** Minimum ML probability to send a file to LLM */
+const MIN_ML_PROBA_RAW = process.env.SC_MIN_ML_PROBA != null ? parseFloat(process.env.SC_MIN_ML_PROBA) : NaN;
+const MIN_ML_PROBA = Number.isFinite(MIN_ML_PROBA_RAW)
+  ? Math.min(1, Math.max(0, MIN_ML_PROBA_RAW))
+  : 0.1;
 
 /**
  * Max files to send to the LLM per package. For large packages this prevents
@@ -24,12 +28,6 @@ const MIN_TRIAGE_SCORE = 8;
  */
 const MAX_LLM_FILES = parseInt(process.env.SC_MAX_LLM_FILES ?? '10');
 const INSTALL_TRIGGER_RE = /\.(pth|sh|bat|ps1)$|\/(?:post-?install|pre-?install|install)\.[jt]s$/i;
-
-export interface PackageInvestigationPlan {
-  allContent: Map<string, string>;
-  triageResults: ReturnType<typeof runTriage>;
-  filesToInvestigate: ReturnType<typeof runTriage>;
-}
 
 type ToolBoundChatModel = Runnable<any, AIMessage>;
 
@@ -136,30 +134,9 @@ export async function primaryAnalysisNode(
   return findings;
 }
 
-export function planPackageInvestigation(source: PackageSource): PackageInvestigationPlan {
-  const allContent = buildContentMap(source);
-  const triageResults = runTriage(allContent);
-  const aboveThreshold = triageResults.filter(r => r.score >= MIN_TRIAGE_SCORE);
-
-  let filesToInvestigate = aboveThreshold;
-  if (aboveThreshold.length > MAX_LLM_FILES) {
-    const priority = aboveThreshold.filter(r => INSTALL_TRIGGER_RE.test(r.filePath));
-    const rest = aboveThreshold
-      .filter(r => !INSTALL_TRIGGER_RE.test(r.filePath))
-      .slice(0, Math.max(0, MAX_LLM_FILES - priority.length));
-    filesToInvestigate = [...priority, ...rest];
-  }
-
-  return {
-    allContent,
-    triageResults,
-    filesToInvestigate,
-  };
-}
-
 /**
  * Investigate a single package using a two-phase approach:
- * 1. Programmatic triage — score all files against threat indicators
+ * 1. ML scoring — score all files with XGBoost classifier
  * 2. Per-file LLM analysis — feed each suspicious file to the LLM for judgment
  */
 export async function analyzePackageWithModel(
@@ -168,16 +145,46 @@ export async function analyzePackageWithModel(
   chatModel: BaseChatModel,
   verbose: boolean
 ): Promise<{ findings: SupplyChainFinding[]; needsLlm: boolean }> {
-  const { allContent, triageResults, filesToInvestigate } = planPackageInvestigation(source);
+  // Phase 1: ML-based scoring (stat features + triage patterns + package signals)
+  const allContent = buildContentMap(source);
+  const packageScore = scorePackage(source, meta, allContent);
+
+  // Also run traditional triage for context (used in LLM prompts)
+  const triageResults = runTriage(allContent);
 
   if (verbose) {
-    console.log(`  [triage:${meta.name}] ${allContent.size} files scanned, ${triageResults.length} with indicators`);
-    console.log(formatTriageResults(triageResults, allContent.size).split('\n').map(l => `  [triage:${meta.name}] ${l}`).join('\n'));
+    const filesAboveMinMl = packageScore.scoredFiles.filter(f => f.maliciousProba >= MIN_ML_PROBA).length;
+    console.log(`  [ml:${meta.name}] ${allContent.size} files scored — max_proba: ${packageScore.maxFileProba.toFixed(3)}, ${filesAboveMinMl} files above ${MIN_ML_PROBA}`);
+    const topFiles = packageScore.scoredFiles.slice(0, 5);
+    for (const f of topFiles) {
+      console.log(`  [ml:${meta.name}]   ${f.maliciousProba.toFixed(3)} ${f.filePath} (triage: ${f.triageScore}, patterns: ${f.matchedPatterns.join(',')})`);
+    }
   }
 
+  // Select files for LLM investigation based on ML probability
+  const mlCandidates = packageScore.scoredFiles.filter(f => f.maliciousProba >= MIN_ML_PROBA);
+
+  // Also include install-trigger files regardless of ML score
+  const installTriggerFiles = packageScore.scoredFiles.filter(
+    f => INSTALL_TRIGGER_RE.test(f.filePath) && f.maliciousProba < MIN_ML_PROBA && f.triageScore > 0
+  );
+
+  let filesToInvestigate = [...mlCandidates, ...installTriggerFiles];
+  if (filesToInvestigate.length > MAX_LLM_FILES) {
+    // Priority: install triggers first, then by probability
+    const priority = filesToInvestigate.filter(f => INSTALL_TRIGGER_RE.test(f.filePath));
+    const rest = filesToInvestigate
+      .filter(f => !INSTALL_TRIGGER_RE.test(f.filePath))
+      .sort((a, b) => b.maliciousProba - a.maliciousProba)
+      .slice(0, Math.max(0, MAX_LLM_FILES - priority.length));
+    filesToInvestigate = [...priority, ...rest];
+  }
+
+  // Build triage lookup for LLM prompt context
+  const triageLookup = new Map(triageResults.map(r => [r.filePath, r]));
+
   if (verbose) {
-    const aboveThreshold = triageResults.filter(r => r.score >= MIN_TRIAGE_SCORE);
-    console.log(`  [triage:${meta.name}] ${aboveThreshold.length} files above score threshold (${MIN_TRIAGE_SCORE}), sending ${filesToInvestigate.length} to LLM (cap: ${MAX_LLM_FILES})`);
+    console.log(`  [ml:${meta.name}] ${mlCandidates.length} files above ML threshold (${MIN_ML_PROBA}), sending ${filesToInvestigate.length} to LLM (cap: ${MAX_LLM_FILES})`);
   }
 
   if (filesToInvestigate.length === 0) {
@@ -196,13 +203,21 @@ export async function analyzePackageWithModel(
   };
 
   const findingsByFile = await Promise.all(
-    filesToInvestigate.map(async (triageEntry, fileIdx) => {
+    filesToInvestigate.map(async (scoredFile, fileIdx) => {
       try {
-        const fileContent = allContent.get(triageEntry.filePath);
+        const fileContent = allContent.get(scoredFile.filePath);
         if (!fileContent) return [];
 
+        // Get triage entry for LLM prompt context (may not exist if ML-only)
+        const triageEntry = triageLookup.get(scoredFile.filePath) ?? {
+          filePath: scoredFile.filePath,
+          score: scoredFile.triageScore,
+          indicators: new Map<string, number>(),
+          categories: new Set(['ml-flagged']),
+        };
+
         if (verbose) {
-          console.log(`  [analyze:${meta.name}] file ${fileIdx + 1}/${filesToInvestigate.length}: ${triageEntry.filePath} (score: ${triageEntry.score}, categories: ${[...triageEntry.categories].join('+')})`);
+          console.log(`  [analyze:${meta.name}] file ${fileIdx + 1}/${filesToInvestigate.length}: ${scoredFile.filePath} (ml_proba: ${scoredFile.maliciousProba.toFixed(3)}, triage: ${scoredFile.triageScore}, patterns: ${scoredFile.matchedPatterns.join(',')})`);
         }
 
         const modelWithTools = chatModel.bindTools!(tools) as ToolBoundChatModel;
@@ -218,7 +233,7 @@ export async function analyzePackageWithModel(
           const response = await invokeWithRetry(
             modelWithTools,
             messages,
-            `LLM analysis failed for ${meta.name}@${source.version} file ${triageEntry.filePath} during round ${round + 1}`,
+            `LLM analysis failed for ${meta.name}@${source.version} file ${scoredFile.filePath} during round ${round + 1}`,
             verbose
           );
           messages.push(response);
@@ -256,7 +271,7 @@ export async function analyzePackageWithModel(
                 packageName: meta.name,
                 packageVersion: source.version,
                 ecosystem: meta.ecosystem,
-                filePath: triageEntry.filePath,
+                filePath: scoredFile.filePath,
                 category: f.category ?? 'code-obfuscation',
                 severity: normalizeSeverity(f.severity),
                 confidence: typeof f.confidence === 'number' ? Math.max(0, Math.min(1, f.confidence)) : 0.5,
@@ -268,7 +283,7 @@ export async function analyzePackageWithModel(
               }));
               fileFindings.push(...newFindings);
               if (verbose) {
-                console.log(`  [analyze:${meta.name}]   reported ${newFindings.length} finding(s) for ${triageEntry.filePath} (file total: ${fileFindings.length})`);
+                console.log(`  [analyze:${meta.name}]   reported ${newFindings.length} finding(s) for ${scoredFile.filePath} (file total: ${fileFindings.length})`);
               }
             }
           }
